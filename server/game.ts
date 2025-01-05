@@ -10,103 +10,122 @@ export async function findOrCreateGame() {
   try {
     console.log('Searching for available game...');
 
-    // Get all waiting games and their player counts
-    const waitingGamesWithCounts = await db
+    // Find waiting games that aren't full
+    const waitingGames = await db
       .select({
         gameId: games.id,
         botLetter: games.botLetter,
-        playerCount: count()
+        playerCount: count(players.id).mapWith(Number)
       })
       .from(games)
       .leftJoin(players, eq(games.id, players.gameId))
       .where(eq(games.status, 'waiting'))
-      .groupBy(games.id);
+      .groupBy(games.id, games.botLetter)
+      .having(lt(count(players.id), MAX_PLAYERS));
 
-    // Filter for games that aren't full
-    const availableGame = waitingGamesWithCounts.find(g => g.playerCount < MAX_PLAYERS);
+    console.log('Found waiting games:', waitingGames);
 
-    if (availableGame) {
-      console.log('Found waiting game:', availableGame.gameId, 'with', availableGame.playerCount, 'players');
+    // Try to join an existing game
+    if (waitingGames.length > 0) {
+      const game = waitingGames[0];
+      console.log('Attempting to join game:', game.gameId);
 
       // Get existing players to find available letters
-      const existingPlayers = await db.select()
+      const existingPlayers = await db
+        .select()
         .from(players)
-        .where(eq(players.gameId, availableGame.gameId));
+        .where(eq(players.gameId, game.gameId));
+
+      console.log('Existing players:', existingPlayers);
 
       const usedLetters = existingPlayers.map(p => p.letter);
       const availableLetters = LETTERS.filter(l => !usedLetters.includes(l));
-      const letter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
 
+      console.log('Available letters:', availableLetters);
+
+      if (availableLetters.length === 0) {
+        throw new Error('No available letters');
+      }
+
+      const letter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
       console.log('Assigning letter:', letter);
 
-      const [player] = await db.insert(players)
+      // Add player to existing game
+      const [player] = await db
+        .insert(players)
         .values({
-          gameId: availableGame.gameId,
+          gameId: game.gameId,
           letter,
           isBot: false
         })
         .returning();
 
-      // If this was the last player needed, start the game
-      if (availableGame.playerCount === MAX_PLAYERS - 1) {
-        console.log('Starting game with ID:', availableGame.gameId);
+      console.log('Added player:', player);
 
-        await db.update(games)
+      // If this was the last player needed, start the game
+      if (game.playerCount === MAX_PLAYERS - 1) {
+        console.log('Starting game:', game.gameId);
+        await db
+          .update(games)
           .set({ status: 'active' })
-          .where(eq(games.id, availableGame.gameId));
+          .where(eq(games.id, game.gameId));
 
         return {
-          gameId: availableGame.gameId,
+          gameId: game.gameId,
           letter: player.letter
         };
       }
 
-      // Return queue state while waiting for more players
+      console.log('Returning queue state for waiting game');
       return {
         queueState: {
-          playersInQueue: availableGame.playerCount + 1,
+          playersInQueue: game.playerCount + 1,
           estimatedWaitTime: BASE_WAIT_TIME
         }
       };
     }
 
-    console.log('Creating new game...');
-
     // Create new game with bot
+    console.log('Creating new game...');
     const botLetter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-    const [game] = await db.insert(games)
-      .values({ 
+    const [newGame] = await db
+      .insert(games)
+      .values({
         status: 'waiting',
-        botLetter 
+        botLetter
       })
       .returning();
 
-    console.log('Created new game:', game.id, 'with bot letter:', botLetter);
+    console.log('Created game:', newGame.id, 'with bot letter:', botLetter);
 
     // Add bot player
-    await db.insert(players)
+    await db
+      .insert(players)
       .values({
-        gameId: game.id,
+        gameId: newGame.id,
         letter: botLetter,
         isBot: true
       });
 
     // Add first human player
-    const playerLetter = LETTERS.find(l => l !== botLetter)!;
-    const [player] = await db.insert(players)
+    const availableLetters = LETTERS.filter(l => l !== botLetter);
+    const playerLetter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
+
+    const [player] = await db
+      .insert(players)
       .values({
-        gameId: game.id,
+        gameId: newGame.id,
         letter: playerLetter,
         isBot: false
       })
       .returning();
 
     console.log('Added first player with letter:', playerLetter);
+    console.log('Returning queue state for new game');
 
-    // Return queue state since we need one more player
     return {
       queueState: {
-        playersInQueue: 2, // Bot + 1 player
+        playersInQueue: 1,
         estimatedWaitTime: BASE_WAIT_TIME
       }
     };

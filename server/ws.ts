@@ -95,6 +95,7 @@ export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ 
     server,
     verifyClient: ({ req }: { req: IncomingMessage }) => {
+      // Skip verification for Vite HMR
       const protocol = req.headers['sec-websocket-protocol'];
       return protocol !== 'vite-hmr';
     }
@@ -102,6 +103,7 @@ export function setupWebSocket(server: Server) {
 
   wss.on('connection', async (ws, req) => {
     try {
+      // Parse game ID and letter from URL
       const url = new URL(req.url!, `http://${req.headers.host}`);
       const gameId = parseInt(url.searchParams.get('gameId') || '');
       const letter = url.searchParams.get('letter') || '';

@@ -24,7 +24,7 @@ export const useQueueStore = create<QueueState>((set) => {
   return {
     inQueue: false,
     playersInQueue: 0,
-    estimatedWaitTime: 30, // Fixed 30-second wait time
+    estimatedWaitTime: 30,
     gameData: null,
 
     joinQueue: async () => {
@@ -39,9 +39,11 @@ export const useQueueStore = create<QueueState>((set) => {
         }
 
         const data = await response.json();
+        console.log('Join queue response:', data);
 
         if (data.gameId && data.letter) {
           // Game is ready immediately
+          clearPollInterval();
           set({ 
             inQueue: false,
             gameData: {
@@ -49,12 +51,12 @@ export const useQueueStore = create<QueueState>((set) => {
               letter: data.letter
             }
           });
-        } else {
+        } else if (data.queueState) {
           // Enter queue state
           set({ 
             inQueue: true,
-            playersInQueue: 1,
-            estimatedWaitTime: 30
+            playersInQueue: data.queueState.playersInQueue,
+            estimatedWaitTime: data.queueState.estimatedWaitTime
           });
 
           // Start polling for game status
@@ -66,12 +68,11 @@ export const useQueueStore = create<QueueState>((set) => {
               });
 
               if (!pollResponse.ok) {
-                clearPollInterval();
-                set({ inQueue: false });
-                return;
+                throw new Error('Failed to poll queue status');
               }
 
               const pollData = await pollResponse.json();
+              console.log('Poll response:', pollData);
 
               if (pollData.gameId && pollData.letter) {
                 clearPollInterval();
@@ -82,13 +83,18 @@ export const useQueueStore = create<QueueState>((set) => {
                     letter: pollData.letter
                   }
                 });
+              } else if (pollData.queueState) {
+                set({
+                  playersInQueue: pollData.queueState.playersInQueue,
+                  estimatedWaitTime: pollData.queueState.estimatedWaitTime
+                });
               }
             } catch (error) {
               console.error('Queue polling error:', error);
               clearPollInterval();
               set({ inQueue: false });
             }
-          }, 2000); // Poll every 2 seconds
+          }, 2000);
         }
       } catch (error) {
         console.error('Failed to join queue:', error);
