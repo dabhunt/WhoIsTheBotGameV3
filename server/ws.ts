@@ -5,6 +5,13 @@ import { db } from '@db';
 import { games, players, messages } from '@db/schema';
 import { eq } from 'drizzle-orm';
 
+interface Message {
+  id: number;
+  playerLetter: string;
+  content: string;
+  createdAt: string;
+}
+
 interface GameState {
   gameId: number;
   clients: Map<string, WebSocket>;
@@ -57,10 +64,13 @@ export function setupWebSocket(server: Server) {
       // Verify game exists and is active
       const game = await db.query.games.findFirst({
         where: eq(games.id, gameId),
+        with: {
+          players: true
+        }
       });
 
-      if (!game || game.status !== 'active') {
-        console.error('Invalid game state:', game);
+      if (!game) {
+        console.error('Game not found:', gameId);
         ws.close();
         return;
       }
@@ -77,6 +87,31 @@ export function setupWebSocket(server: Server) {
 
       // Add client to game state
       gameState.clients.set(letter, ws);
+
+      // Convert players array to map for easier state management
+      const playerStates = new Map();
+      game.players.forEach(player => {
+        // Initialize time remaining for all non-eliminated players
+        const timeRemaining = !player.eliminated ? 30 : 0;
+
+        playerStates.set(player.letter, {
+          eliminated: player.eliminated,
+          hasGuessed: player.hasGuessed,
+          isBot: player.isBot,
+          timeRemaining
+        });
+      });
+
+      // Send initial game state
+      ws.send(JSON.stringify({
+        type: 'gameState',
+        state: {
+          players: Object.fromEntries(playerStates),
+          gameOver: game.status === 'finished',
+          winner: game.winnerPlayerId ? 
+            (game.players.find(p => p.id === game.winnerPlayerId)?.letter || null) : null
+        }
+      }));
 
       // Send existing messages
       const existingMessages = await db.select()
@@ -105,7 +140,30 @@ export function setupWebSocket(server: Server) {
               })
               .returning();
 
-            // Broadcast to all clients in game
+            // Reset timer for the player who sent the message
+            const playerState = playerStates.get(letter);
+            if (playerState && !playerState.eliminated) {
+              playerState.timeRemaining = 30;
+
+              // Broadcast updated game state to all clients
+              const gameStateUpdate = JSON.stringify({
+                type: 'gameState',
+                state: {
+                  players: Object.fromEntries(playerStates),
+                  gameOver: game.status === 'finished',
+                  winner: game.winnerPlayerId ? 
+                    (game.players.find(p => p.id === game.winnerPlayerId)?.letter || null) : null
+                }
+              });
+
+              gameState?.clients.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN) {
+                  client.send(gameStateUpdate);
+                }
+              });
+            }
+
+            // Broadcast message to all clients
             const broadcast = JSON.stringify({
               type: 'message',
               message: newMessage

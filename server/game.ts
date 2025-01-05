@@ -3,8 +3,8 @@ import { games, players } from '@db/schema.js';
 import { eq } from 'drizzle-orm';
 import { logMatchmaking, logError, logGameState, MatchmakingError, ErrorCodes } from './utils/logger.js';
 
-const LETTERS = ['A', 'B', 'C'];  // Only need 3 letters now: 2 players + 1 bot
-const MAX_PLAYERS = 2; // Changed to 2 for testing (1 human + 1 bot)
+const LETTERS = ['A', 'B', 'C'];  // Three letters for three players (2 humans + 1 bot)
+const MAX_PLAYERS = 3; // Changed to 3 (2 humans + 1 bot)
 const BASE_WAIT_TIME = 30; // Fixed 30 second wait time
 const MIN_GAME_CREATION_INTERVAL = 5000; // Minimum 5 seconds between game creations
 const STALE_GAME_THRESHOLD = 5 * 60 * 1000; // 5 minutes
@@ -14,7 +14,7 @@ const activeGames = new Map<number, {
   status: string;
   playerCount: number;
   lastUpdated: number;
-  locked: boolean; // Add lock to prevent race conditions
+  locked: boolean;
 }>();
 
 let lastGameCreationTime = 0;
@@ -45,15 +45,16 @@ async function cleanupStaleGames() {
   }
 }
 
-async function findAvailableGame(): Promise<number | null> {
+async function findAvailableGame(): Promise<number | undefined> {
   const entries = Array.from(activeGames.entries());
   for (const [gameId, state] of entries) {
+    // Only return game if it's waiting and has room for more players
     if (state.status === 'waiting' && state.playerCount < MAX_PLAYERS && !state.locked) {
       state.locked = true; // Lock the game while we try to join
       return gameId;
     }
   }
-  return null;
+  return undefined;
 }
 
 export async function findOrCreateGame() {
@@ -66,6 +67,7 @@ export async function findOrCreateGame() {
 
     // First try to find an available game
     let gameId = await findAvailableGame();
+    logMatchmaking('Searching for available game...', { requestId, gameId });
 
     // If no game available, check if we can create one
     if (!gameId) {
@@ -77,16 +79,19 @@ export async function findOrCreateGame() {
         });
         return {
           queueState: {
-            playersInQueue: activeGames.size,
+            playersInQueue: 1,
             estimatedWaitTime: BASE_WAIT_TIME
           }
         };
       }
 
-      // Create new game
+      // Create new game with bot
       try {
         const result = await db.transaction(async (tx) => {
+          // Randomly assign bot letter
           const botLetter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+
+          // Create game
           const [game] = await tx
             .insert(games)
             .values({
@@ -110,12 +115,12 @@ export async function findOrCreateGame() {
         lastGameCreationTime = now;
         gameId = result.id;
 
-        // Update active games map with initial lock
+        // Initialize active game state
         activeGames.set(gameId, {
           status: 'waiting',
-          playerCount: 1, // Bot counts as a player
+          playerCount: 1, // Bot counts as first player
           lastUpdated: now,
-          locked: true // Lock the new game immediately
+          locked: true, // Lock new game immediately
         });
 
         logGameState('Created new game', {
@@ -123,6 +128,7 @@ export async function findOrCreateGame() {
           gameId,
           botLetter: result.botLetter
         });
+
       } catch (error) {
         logError('Failed to create new game', { error: error as Error });
         throw new MatchmakingError(
@@ -138,6 +144,9 @@ export async function findOrCreateGame() {
       const result = await db.transaction(async (tx) => {
         const game = await tx.query.games.findFirst({
           where: eq(games.id, gameId!),
+          with: {
+            players: true
+          }
         });
 
         if (!game || game.status !== 'waiting') {
@@ -149,23 +158,8 @@ export async function findOrCreateGame() {
           );
         }
 
-        const existingPlayers = await tx
-          .select()
-          .from(players)
-          .where(eq(players.gameId, game.id))
-          .execute();
-
-        if (existingPlayers.length >= MAX_PLAYERS) {
-          activeGames.delete(game.id);
-          throw new MatchmakingError(
-            'Game is full',
-            ErrorCodes.GAME_FULL,
-            400
-          );
-        }
-
         // Get available letter
-        const usedLetters = existingPlayers.map(p => p.letter);
+        const usedLetters = game.players.map(p => p.letter);
         const availableLetters = LETTERS.filter(l => 
           !usedLetters.includes(l) && 
           l !== game.botLetter
@@ -192,10 +186,10 @@ export async function findOrCreateGame() {
         let gameState = activeGames.get(game.id);
         if (gameState) {
           // Update player count and timestamp
-          gameState.playerCount = existingPlayers.length + 1;
+          gameState.playerCount = game.players.length + 1; // Include the new player
           gameState.lastUpdated = Date.now();
 
-          // If this fills the game, mark it as active
+          // Only transition to active state if we have all players (2 humans + 1 bot)
           if (gameState.playerCount >= MAX_PLAYERS) {
             gameState.status = 'active';
             await tx
@@ -206,7 +200,8 @@ export async function findOrCreateGame() {
 
             logGameState('Game is full, activating', {
               requestId,
-              gameId: game.id
+              gameId: game.id,
+              playerCount: gameState.playerCount
             });
 
             // Unlock the game and return game data
@@ -219,11 +214,18 @@ export async function findOrCreateGame() {
 
           // If not full, unlock and return queue state
           gameState.locked = false;
+          return {
+            queueState: {
+              playersInQueue: gameState.playerCount,
+              estimatedWaitTime: BASE_WAIT_TIME
+            }
+          };
         }
 
+        // Return queue state if game state not found
         return {
           queueState: {
-            playersInQueue: activeGames.size,
+            playersInQueue: 1,
             estimatedWaitTime: BASE_WAIT_TIME
           }
         };
