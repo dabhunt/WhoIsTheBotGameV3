@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { logGameState } from '../utils/logger.js';
+import { logGameState } from '../utils/logger';
 
 // the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
 const anthropic = new Anthropic({

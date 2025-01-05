@@ -1,10 +1,10 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { setupWebSocket } from "./ws.js";
-import { findOrCreateGame } from "./game.js";
-import { requestLogger, MatchmakingError, ErrorCodes } from './utils/logger.js';
-import { db } from '@db/index.js';
-import { games, players } from '@db/schema.js';
+import { setupWebSocket } from "./ws";
+import { findOrCreateGame } from "./game";
+import { requestLogger, MatchmakingError, ErrorCodes } from './utils/logger';
+import { db } from '@db';
+import { games, players } from '@db/schema';
 import { eq } from 'drizzle-orm';
 
 export function registerRoutes(app: Express): Server {

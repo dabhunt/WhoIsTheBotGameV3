@@ -14,7 +14,9 @@ export function PlayerList() {
         {Array.from(playerStates.entries()).map(([letter, state]) => (
           <div key={letter} className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-medium">Player {letter}</span>
+              <span className="font-medium text-primary">
+                {letter}
+              </span>
               <div className="flex gap-2">
                 {state.eliminated && (
                   <Badge variant="destructive">Eliminated</Badge>

@@ -1,7 +1,7 @@
-import { db } from '@db/index.js';
-import { games, players } from '@db/schema.js';
+import { db } from '@db';
+import { games, players } from '@db/schema';
 import { eq } from 'drizzle-orm';
-import { logMatchmaking, logError, logGameState, MatchmakingError, ErrorCodes } from './utils/logger.js';
+import { logMatchmaking, logError, logGameState, MatchmakingError, ErrorCodes } from './utils/logger';
 
 const LETTERS = ['A', 'B', 'C'];  // Three letters for three players (2 humans + 1 bot)
 const MAX_PLAYERS = 3; // Total players (2 humans + 1 bot)
@@ -144,10 +144,10 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
 
     // Return queue state if we don't have exactly 2 players
     if (currentWaitingCount < REQUIRED_HUMAN_PLAYERS) {
-      logMatchmaking('Not enough players, returning queue state', { 
-        requestId, 
+      logMatchmaking('Not enough players, returning queue state', {
+        requestId,
         currentCount: currentWaitingCount,
-        required: REQUIRED_HUMAN_PLAYERS 
+        required: REQUIRED_HUMAN_PLAYERS
       });
       return {
         queueState: {
@@ -160,7 +160,7 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
     // Check if we can create a new game
     const now = Date.now();
     if (now - lastGameCreationTime < MIN_GAME_CREATION_INTERVAL) {
-      logMatchmaking('Too soon to create game, waiting', { 
+      logMatchmaking('Too soon to create game, waiting', {
         requestId,
         timeRemaining: MIN_GAME_CREATION_INTERVAL - (now - lastGameCreationTime)
       });
@@ -231,7 +231,7 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
         gameState.lastUpdated = Date.now();
       }
 
-      logMatchmaking('Game created successfully', { 
+      logMatchmaking('Game created successfully', {
         requestId,
         gameId: result.gameId,
         playerCount: MAX_PLAYERS

@@ -4,7 +4,7 @@ import type { Server } from 'http';
 import { db } from '@db';
 import { games, players, messages } from '@db/schema';
 import { eq } from 'drizzle-orm';
-import { botChatService } from './services/bot.js';
+import { botChatService } from './services/bot';
 
 interface Message {
   id: number;
