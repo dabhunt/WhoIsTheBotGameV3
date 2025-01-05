@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupWebSocket } from "./ws";
-import { findOrCreateGame } from "./game";
+import { setupWebSocket } from "./ws.js";
+import { findOrCreateGame } from "./game.js";
 
 export function registerRoutes(app: Express): Server {
   app.post('/api/games/join', async (req, res) => {

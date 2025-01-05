@@ -1,6 +1,6 @@
-import { db } from '@db';
-import { games, players } from '@db/schema';
-import { eq, and } from 'drizzle-orm';
+import { db } from '@db/index.js';
+import { games, players } from '@db/schema.js';
+import { eq } from 'drizzle-orm';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const MAX_PLAYERS = 8;

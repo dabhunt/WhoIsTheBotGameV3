@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { db } from '@db';
-import { messages } from '@db/schema';
+import { db } from '@db/index.js';
+import { messages } from '@db/schema.js';
 import { eq } from 'drizzle-orm';
 
 // the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
@@ -18,7 +18,7 @@ export async function handleBotMessage(userMessage: string, gameId: number): Pro
       .limit(5);
 
     const messageHistory = recentMessages.map(msg => ({
-      role: msg.playerLetter === 'Bot' ? 'assistant' : 'user',
+      role: msg.playerLetter === 'Bot' ? 'assistant' as const : 'user' as const,
       content: msg.content
     }));
 
@@ -30,11 +30,15 @@ export async function handleBotMessage(userMessage: string, gameId: number): Pro
       messages: [
         ...messageHistory,
         {
-          role: 'user',
+          role: 'user' as const,
           content: userMessage
         }
       ]
     });
+
+    if (!response.content[0] || response.content[0].type !== 'text') {
+      return null;
+    }
 
     return response.content[0].text;
   } catch (error) {
