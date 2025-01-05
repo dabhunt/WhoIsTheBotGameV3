@@ -16,7 +16,7 @@ export function Home() {
             <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
               Who Is The Bot?
             </h1>
-            <p className="text-xl text-slate-300">
+            <p className="text-xl text-white">
               A unique multiplayer twist on the Turing test where deception and detection collide
             </p>
           </div>
@@ -24,42 +24,46 @@ export function Home() {
           <div className="flex justify-center space-x-8 py-6">
             <div className="flex items-center space-x-2">
               <Users className="w-6 h-6 text-blue-400" />
-              <span className="text-lg">2 Players</span>
+              <span className="text-lg text-white">2 Players</span>
             </div>
             <div className="flex items-center space-x-2">
               <Bot className="w-6 h-6 text-purple-400" />
-              <span className="text-lg">1 Bot</span>
+              <span className="text-lg text-white">1 Bot</span>
             </div>
             <div className="flex items-center space-x-2">
               <Target className="w-6 h-6 text-green-400" />
-              <span className="text-lg">1 Winner</span>
+              <span className="text-lg text-white">1 Winner</span>
             </div>
           </div>
 
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold">Game Rules</h2>
-            <ul className="space-y-3 text-slate-300">
-              <li className="flex items-center">
+            <h2 className="text-2xl font-semibold text-white">Game Rules</h2>
+            <ul className="space-y-3">
+              <li className="flex items-center text-white">
                 <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                Join an anonymous chat room with up to 7 other players
+                Join a game with one other player
               </li>
-              <li className="flex items-center">
+              <li className="flex items-center text-white">
                 <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
                 One player is secretly an AI bot
               </li>
-              <li className="flex items-center">
+              <li className="flex items-center text-white">
                 <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                Blend in without revealing yourself as a human
+                Chat with others to figure out who's the bot
               </li>
-              <li className="flex items-center">
+              <li className="flex items-center text-white">
+                <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                You must send a message every 30 seconds or be eliminated
+              </li>
+              <li className="flex items-center text-white">
                 <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
                 Use /guess [LETTER] to make your guess
               </li>
-              <li className="flex items-center">
+              <li className="flex items-center text-white">
                 <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
                 Guess wrong and you're eliminated!
               </li>
-              <li className="flex items-center">
+              <li className="flex items-center text-white">
                 <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
                 First to correctly identify the bot wins
               </li>
@@ -68,15 +72,15 @@ export function Home() {
 
           {inQueue ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-center gap-2 text-slate-300">
+              <div className="flex items-center justify-center gap-2 text-white">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Finding a game...</span>
               </div>
               <div className="text-center space-y-1">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-white">
                   Players in queue: {playersInQueue}
                 </p>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-white">
                   Estimated wait time: {estimatedWaitTime}s
                 </p>
               </div>
@@ -97,7 +101,7 @@ export function Home() {
             </Button>
           )}
 
-          <p className="text-center text-slate-400 text-sm">
+          <p className="text-center text-white text-sm">
             Can you outsmart the AI and spot the digital impostor? Test your human intuition now!
           </p>
         </CardContent>
