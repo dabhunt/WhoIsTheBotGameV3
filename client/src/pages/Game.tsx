@@ -11,18 +11,32 @@ export function Game() {
   const { connect, disconnect, gameOver, winner } = useGameState();
 
   useEffect(() => {
-    const url = new URL(location, window.location.origin);
-    const gameId = parseInt(url.pathname.split('/').pop() || '');
-    const letter = url.searchParams.get('letter');
+    try {
+      // Parse gameId from URL path and letter from query params
+      const [, gameIdStr] = location.match(/\/game\/(\d+)/) || [];
+      const gameId = parseInt(gameIdStr);
+      const letter = new URLSearchParams(window.location.search).get('letter');
 
-    if (!gameId || !letter) {
+      console.log('Game component initializing with:', { gameId, letter });
+
+      if (!gameId || !letter) {
+        console.error('Missing required game parameters:', { gameId, letter });
+        setLocation('/');
+        return;
+      }
+
+      console.log('Connecting to game:', gameId, 'as player:', letter);
+      connect(gameId, letter);
+
+      return () => {
+        console.log('Game component unmounting, disconnecting WebSocket');
+        disconnect();
+      };
+    } catch (error) {
+      console.error('Error initializing game:', error);
       setLocation('/');
-      return;
     }
-
-    connect(gameId, letter);
-    return () => disconnect();
-  }, [location]);
+  }, [location, setLocation]);
 
   return (
     <div className="min-h-screen bg-background p-4">

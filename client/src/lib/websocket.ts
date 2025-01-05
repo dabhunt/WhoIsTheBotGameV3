@@ -42,15 +42,22 @@ export const useGameState = create<GameState>((set, get) => ({
       // Disconnect existing connection if any
       const currentWs = get().ws;
       if (currentWs) {
+        console.log('Closing existing WebSocket connection');
         currentWs.close();
       }
 
       console.log('Connecting to WebSocket for game:', gameId, 'as player:', letter);
 
-      // Construct WebSocket URL
+      // Ensure clean values for URL construction
+      const sanitizedGameId = encodeURIComponent(gameId);
+      const sanitizedLetter = encodeURIComponent(letter);
+
+      // Construct WebSocket URL with explicit path
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws?gameId=${gameId}&letter=${letter}`;
+      const wsUrl = `${protocol}//${host}/ws?gameId=${sanitizedGameId}&letter=${sanitizedLetter}`;
+
+      console.log('Attempting WebSocket connection to:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
 
@@ -66,22 +73,36 @@ export const useGameState = create<GameState>((set, get) => ({
 
           switch (data.type) {
             case 'history':
+              console.log('Received message history:', data.messages);
               set({ messages: data.messages });
               break;
 
             case 'message':
+              console.log('Received new message:', data.message);
               set((state) => ({
                 messages: [...state.messages, data.message],
               }));
               break;
+
+            case 'gameState':
+              console.log('Received game state update:', data.state);
+              set((state) => ({
+                playerStates: new Map(Object.entries(data.state.players)),
+                gameOver: data.state.gameOver,
+                winner: data.state.winner
+              }));
+              break;
+
+            default:
+              console.log('Unknown message type:', data.type);
           }
         } catch (error) {
           console.error('Error processing WebSocket message:', error);
         }
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.code, event.reason);
         set({ connected: false });
       };
 
@@ -100,6 +121,7 @@ export const useGameState = create<GameState>((set, get) => ({
   disconnect: () => {
     const ws = get().ws;
     if (ws) {
+      console.log('Manually disconnecting WebSocket');
       ws.close();
     }
     set({
@@ -115,21 +137,27 @@ export const useGameState = create<GameState>((set, get) => ({
   sendMessage: (content: string) => {
     const ws = get().ws;
     if (ws?.readyState === WebSocket.OPEN) {
+      console.log('Sending message:', content);
       ws.send(JSON.stringify({
         type: 'chat',
         content,
       }));
+    } else {
+      console.warn('Cannot send message: WebSocket not connected');
     }
   },
 
   makeGuess: (guessedLetter: string, playerId: number) => {
     const ws = get().ws;
     if (ws?.readyState === WebSocket.OPEN) {
+      console.log('Making guess:', guessedLetter, 'for player:', playerId);
       ws.send(JSON.stringify({
         type: 'guess',
         guessedLetter,
         playerId,
       }));
+    } else {
+      console.warn('Cannot make guess: WebSocket not connected');
     }
   },
 

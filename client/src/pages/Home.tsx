@@ -12,8 +12,14 @@ export function Home() {
   // Handle navigation when game data is available
   useEffect(() => {
     if (gameData) {
-      setLocation(`/game/${gameData.gameId}?letter=${gameData.letter}`);
-      useQueueStore.getState().setGameData(null); // Reset game data after navigation
+      console.log('Navigating to game page with:', gameData);
+      const gameRoute = `/game/${gameData.gameId}?letter=${gameData.letter}`;
+      console.log('Routing to:', gameRoute);
+      setLocation(gameRoute);
+      // Only reset game data after successful navigation
+      setTimeout(() => {
+        useQueueStore.getState().setGameData(null);
+      }, 100);
     }
   }, [gameData, setLocation]);
 
@@ -48,34 +54,20 @@ export function Home() {
           <div className="space-y-6">
             <h2 className="text-2xl font-semibold text-white">Game Rules</h2>
             <ul className="space-y-3">
-              <li className="flex items-center text-white">
-                <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                Join a game with one other player
-              </li>
-              <li className="flex items-center text-white">
-                <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                One player is secretly an AI bot
-              </li>
-              <li className="flex items-center text-white">
-                <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                Chat with others to figure out who's the bot
-              </li>
-              <li className="flex items-center text-white">
-                <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                You must send a message every 30 seconds or be eliminated
-              </li>
-              <li className="flex items-center text-white">
-                <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                Use /guess [LETTER] to make your guess
-              </li>
-              <li className="flex items-center text-white">
-                <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                Guess wrong and you're eliminated!
-              </li>
-              <li className="flex items-center text-white">
-                <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                First to correctly identify the bot wins
-              </li>
+              {[
+                'Join a game with one other player',
+                'One player is secretly an AI bot',
+                'Chat with others to figure out who\'s the bot',
+                'You must send a message every 30 seconds or be eliminated',
+                'Use /guess [LETTER] to make your guess',
+                'Guess wrong and you\'re eliminated!',
+                'First to correctly identify the bot wins'
+              ].map((rule, index) => (
+                <li key={index} className="flex items-center text-white">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  {rule}
+                </li>
+              ))}
             </ul>
           </div>
 
