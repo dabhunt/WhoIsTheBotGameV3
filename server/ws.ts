@@ -4,7 +4,7 @@ import type { Server } from 'http';
 import { db } from '@db';
 import { games, players, messages } from '@db/schema';
 import { eq, and } from 'drizzle-orm';
-import { handleBotMessage } from './bot';
+import { handleBotMessage } from './bot.js';  // Add .js extension for ESM
 
 interface GameState {
   gameId: number;
