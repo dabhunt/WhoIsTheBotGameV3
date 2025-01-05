@@ -2,8 +2,10 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupWebSocket } from "./ws.js";
 import { findOrCreateGame } from "./game.js";
-import { requestLogger } from "./utils/logger.js";
-import { MatchmakingError } from "./utils/logger.js";
+import { requestLogger, MatchmakingError, ErrorCodes } from './utils/logger.js';
+import { db } from '@db/index.js';
+import { games, players } from '@db/schema.js';
+import { eq } from 'drizzle-orm';
 
 export function registerRoutes(app: Express): Server {
   // Create HTTP server first

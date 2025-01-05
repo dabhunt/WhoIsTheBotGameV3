@@ -52,7 +52,7 @@ export const useQueueStore = create<QueueState>((set, get) => {
         console.log('Join queue response:', data);
 
         if (data.gameId && data.letter) {
-          // Game is ready immediately
+          // Game is ready immediately (unlikely with new 2-player requirement)
           console.log('Game is ready immediately:', data);
           clearPollInterval();
           set({ 
@@ -90,18 +90,14 @@ export const useQueueStore = create<QueueState>((set, get) => {
               });
 
               if (!pollResponse.ok) {
-                const retryCount = get().retryCount + 1;
-                if (retryCount >= MAX_RETRY_COUNT) {
-                  throw new Error('Failed to poll queue status after multiple retries');
-                }
-                set({ retryCount });
-                return;
+                throw new Error(`Failed to poll queue status: ${pollResponse.status}`);
               }
 
               const pollData = await pollResponse.json();
               console.log('Poll response:', pollData);
 
               if (pollData.gameId && pollData.letter) {
+                // Game is ready
                 console.log('Game found from poll:', pollData);
                 clearPollInterval();
                 set({ 
@@ -114,6 +110,7 @@ export const useQueueStore = create<QueueState>((set, get) => {
                   }
                 });
               } else if (pollData.queueState) {
+                // Update queue state
                 console.log('Updated queue state:', pollData.queueState);
                 set({
                   retryCount: 0,

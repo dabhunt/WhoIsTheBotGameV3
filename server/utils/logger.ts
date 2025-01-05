@@ -6,6 +6,8 @@ interface LogContext {
   playerId?: string | number;
   error?: Error;
   status?: string;
+  count?: number;
+  duration?: string;
   [key: string]: any; // Allow additional context properties
 }
 
@@ -72,7 +74,7 @@ export function requestLogger(req: Request, res: Response, next: Function) {
     console.log(formatLogMessage(message, { 
       requestId,
       duration: `${duration}ms`,
-      status: res.statusCode
+      status: res.statusCode.toString() // Convert status to string
     }));
   });
 
