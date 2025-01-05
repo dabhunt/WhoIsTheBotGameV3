@@ -30,6 +30,7 @@ export const useQueueStore = create<QueueState>((set, get) => {
 
     joinQueue: async () => {
       try {
+        console.log('Attempting to join queue...');
         const response = await fetch('/api/games/join', {
           method: 'POST',
           credentials: 'include'
@@ -64,6 +65,11 @@ export const useQueueStore = create<QueueState>((set, get) => {
 
           // Start polling for game status
           pollIntervalId = setInterval(async () => {
+            if (!get().inQueue) {
+              clearPollInterval();
+              return;
+            }
+
             try {
               console.log('Polling for game status...');
               const pollResponse = await fetch('/api/games/join', {
@@ -100,7 +106,7 @@ export const useQueueStore = create<QueueState>((set, get) => {
               clearPollInterval();
               set({ inQueue: false });
             }
-          }, 2000);
+          }, 3000); // Poll every 3 seconds
         }
       } catch (error) {
         console.error('Failed to join queue:', error);
