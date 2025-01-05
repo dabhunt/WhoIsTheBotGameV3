@@ -93,7 +93,7 @@ export function generateGameSummary(winner: string | null, playerLetter: string)
 }
 
 export const GAME_RULES = [
-  'Join a game with up to 7 other players',
+  'Join a game with one other player',
   'One player is secretly an AI bot',
   'Chat with others to figure out who\'s the bot',
   'Use /guess [LETTER] to make your guess',
@@ -101,13 +101,13 @@ export const GAME_RULES = [
   'First to correctly identify the bot wins'
 ];
 
-export const MAX_PLAYERS = 8;
+export const MAX_PLAYERS = 3;
 export const MAX_MESSAGE_LENGTH = 500;
-export const VALID_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+export const VALID_LETTERS = ['A', 'B', 'C'];
 
 export function sanitizeMessage(content: string): string {
   return content
     .trim()
     .slice(0, MAX_MESSAGE_LENGTH)
-    .replace(/[<>]/g, ''); // Basic XSS prevention
+    .replace(/[<>]/g, ''); 
 }

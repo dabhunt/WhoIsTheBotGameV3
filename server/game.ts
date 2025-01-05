@@ -2,8 +2,8 @@ import { db } from '@db/index.js';
 import { games, players } from '@db/schema.js';
 import { eq } from 'drizzle-orm';
 
-const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const MAX_PLAYERS = 8;
+const LETTERS = ['A', 'B', 'C'];  // Only need 3 letters now: 2 players + 1 bot
+const MAX_PLAYERS = 3; // 2 players + 1 bot
 const BASE_WAIT_TIME = 15; // base wait time in seconds
 
 export async function findOrCreateGame() {
@@ -33,26 +33,25 @@ export async function findOrCreateGame() {
         })
         .returning();
 
-      // If we're not at max players yet, return queue state
-      if (playerCount < MAX_PLAYERS - 1) {
-        const estimatedWaitTime = BASE_WAIT_TIME * (MAX_PLAYERS - playerCount - 1);
+      // If this was the last player needed, start the game
+      if (playerCount === MAX_PLAYERS - 2) { // Start game when second player joins
+        await db.update(games)
+          .set({ status: 'active' })
+          .where(eq(games.id, waitingGame.id));
+
         return {
-          queueState: {
-            playersInQueue: playerCount + 1,
-            estimatedWaitTime
-          }
+          gameId: waitingGame.id,
+          playerId: player.id,
+          letter: player.letter
         };
       }
 
-      // If this was the last player needed, start the game
-      await db.update(games)
-        .set({ status: 'active' })
-        .where(eq(games.id, waitingGame.id));
-
+      // Return queue state while waiting for second player
       return {
-        gameId: waitingGame.id,
-        playerId: player.id,
-        letter: player.letter
+        queueState: {
+          playersInQueue: playerCount + 1,
+          estimatedWaitTime: BASE_WAIT_TIME
+        }
       };
     }
   }
@@ -74,7 +73,7 @@ export async function findOrCreateGame() {
       isBot: true
     });
 
-  // Add human player
+  // Add first human player
   const playerLetter = LETTERS.find(l => l !== botLetter)!;
   const [player] = await db.insert(players)
     .values({
@@ -84,11 +83,11 @@ export async function findOrCreateGame() {
     })
     .returning();
 
-  // Return queue state since we need more players
+  // Return queue state since we need one more player
   return {
     queueState: {
-      playersInQueue: 2,
-      estimatedWaitTime: BASE_WAIT_TIME * (MAX_PLAYERS - 2)
+      playersInQueue: 2, // Bot + 1 player
+      estimatedWaitTime: BASE_WAIT_TIME
     }
   };
 }

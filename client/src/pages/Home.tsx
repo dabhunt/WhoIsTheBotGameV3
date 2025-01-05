@@ -1,6 +1,6 @@
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useQueueStore } from '@/lib/queue';
 import { Bot, Users, Target, Loader2 } from 'lucide-react';
 
@@ -24,7 +24,7 @@ export function Home() {
           <div className="flex justify-center space-x-8 py-6">
             <div className="flex items-center space-x-2">
               <Users className="w-6 h-6 text-blue-400" />
-              <span className="text-lg">2-7 Players</span>
+              <span className="text-lg">2 Players</span>
             </div>
             <div className="flex items-center space-x-2">
               <Bot className="w-6 h-6 text-purple-400" />

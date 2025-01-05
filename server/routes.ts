@@ -4,6 +4,7 @@ import { setupWebSocket } from "./ws.js";
 import { findOrCreateGame } from "./game.js";
 
 export function registerRoutes(app: Express): Server {
+  // Game matchmaking endpoint
   app.post('/api/games/join', async (req, res) => {
     try {
       const result = await findOrCreateGame();
@@ -14,6 +15,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Create HTTP server and setup WebSocket
   const httpServer = createServer(app);
   setupWebSocket(httpServer);
 
