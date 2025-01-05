@@ -43,6 +43,7 @@ export const useQueueStore = create<QueueState>((set) => {
 
         if (data.gameId && data.letter) {
           // Game is ready immediately
+          console.log('Game is ready, transitioning to game page with:', data);
           clearPollInterval();
           set({ 
             inQueue: false,
@@ -53,6 +54,7 @@ export const useQueueStore = create<QueueState>((set) => {
           });
         } else if (data.queueState) {
           // Enter queue state
+          console.log('Entering queue with state:', data.queueState);
           set({ 
             inQueue: true,
             playersInQueue: data.queueState.playersInQueue,
@@ -75,6 +77,7 @@ export const useQueueStore = create<QueueState>((set) => {
               console.log('Poll response:', pollData);
 
               if (pollData.gameId && pollData.letter) {
+                console.log('Game found from poll, transitioning to game page');
                 clearPollInterval();
                 set({ 
                   inQueue: false,
@@ -84,6 +87,7 @@ export const useQueueStore = create<QueueState>((set) => {
                   }
                 });
               } else if (pollData.queueState) {
+                console.log('Updated queue state:', pollData.queueState);
                 set({
                   playersInQueue: pollData.queueState.playersInQueue,
                   estimatedWaitTime: pollData.queueState.estimatedWaitTime
@@ -104,6 +108,7 @@ export const useQueueStore = create<QueueState>((set) => {
     },
 
     leaveQueue: () => {
+      console.log('Leaving queue');
       clearPollInterval();
       set({ 
         inQueue: false, 
@@ -114,6 +119,7 @@ export const useQueueStore = create<QueueState>((set) => {
     },
 
     setGameData: (data) => {
+      console.log('Setting game data:', data);
       set({ gameData: data });
     }
   };
