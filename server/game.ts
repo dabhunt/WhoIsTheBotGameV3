@@ -10,10 +10,10 @@ export async function findOrCreateGame() {
   try {
     console.log('Searching for available game...');
 
-    // Find waiting games that aren't full
+    // Find waiting games with their current player count
     const waitingGames = await db
       .select({
-        gameId: games.id,
+        id: games.id,
         botLetter: games.botLetter,
         playerCount: count(players.id).mapWith(Number)
       })
@@ -21,72 +21,83 @@ export async function findOrCreateGame() {
       .leftJoin(players, eq(games.id, players.gameId))
       .where(eq(games.status, 'waiting'))
       .groupBy(games.id, games.botLetter)
-      .having(lt(count(players.id), MAX_PLAYERS));
+      .having(lt(count(players.id), MAX_PLAYERS))
+      .execute();
 
     console.log('Found waiting games:', waitingGames);
 
     // Try to join an existing game
     if (waitingGames.length > 0) {
-      const game = waitingGames[0];
-      console.log('Attempting to join game:', game.gameId);
+      // Sort by player count descending to fill up games faster
+      const game = waitingGames.sort((a, b) => b.playerCount - a.playerCount)[0];
+      console.log('Attempting to join game:', game.id, 'with current player count:', game.playerCount);
 
-      // Get existing players to find available letters
+      // Get available letters (excluding bot letter and used letters)
       const existingPlayers = await db
         .select()
         .from(players)
-        .where(eq(players.gameId, game.gameId));
-
-      console.log('Existing players:', existingPlayers);
+        .where(eq(players.gameId, game.id))
+        .execute();
 
       const usedLetters = existingPlayers.map(p => p.letter);
-      const availableLetters = LETTERS.filter(l => !usedLetters.includes(l));
+      console.log('Used letters:', usedLetters, 'Bot letter:', game.botLetter);
 
-      console.log('Available letters:', availableLetters);
+      const availableLetters = LETTERS.filter(l => 
+        !usedLetters.includes(l) && l !== game.botLetter
+      );
+
+      console.log('Available letters for new player:', availableLetters);
 
       if (availableLetters.length === 0) {
         throw new Error('No available letters');
       }
 
-      const letter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
-      console.log('Assigning letter:', letter);
-
       // Add player to existing game
+      const letter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
       const [player] = await db
         .insert(players)
         .values({
-          gameId: game.gameId,
+          gameId: game.id,
           letter,
           isBot: false
         })
         .returning();
 
-      console.log('Added player:', player);
+      // Get updated player count
+      const [{ count: currentPlayerCount }] = await db
+        .select({ count: count().mapWith(Number) })
+        .from(players)
+        .where(eq(players.gameId, game.id))
+        .execute();
 
-      // If this was the last player needed, start the game
-      if (game.playerCount === MAX_PLAYERS - 1) {
-        console.log('Starting game:', game.gameId);
+      console.log('After adding player - Current player count:', currentPlayerCount, 'MAX_PLAYERS:', MAX_PLAYERS);
+
+      // Check if game can start
+      if (currentPlayerCount >= MAX_PLAYERS) {
+        console.log('Starting game:', game.id, 'Current players:', currentPlayerCount, 'Status changing to active');
         await db
           .update(games)
           .set({ status: 'active' })
-          .where(eq(games.id, game.gameId));
+          .where(eq(games.id, game.id));
 
         return {
-          gameId: game.gameId,
+          gameId: game.id,
           letter: player.letter
         };
       }
 
-      console.log('Returning queue state for waiting game');
+      // Return queue state
+      console.log('Game not ready to start - Returning queue state with count:', currentPlayerCount);
       return {
         queueState: {
-          playersInQueue: game.playerCount + 1,
+          playersInQueue: currentPlayerCount,
           estimatedWaitTime: BASE_WAIT_TIME
         }
       };
     }
 
     // Create new game with bot
-    console.log('Creating new game...');
+    console.log('No waiting games found, creating new game with bot');
     const botLetter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
     const [newGame] = await db
       .insert(games)
@@ -96,7 +107,7 @@ export async function findOrCreateGame() {
       })
       .returning();
 
-    console.log('Created game:', newGame.id, 'with bot letter:', botLetter);
+    console.log('Created new game:', newGame.id, 'with bot letter:', botLetter);
 
     // Add bot player
     await db
@@ -110,7 +121,6 @@ export async function findOrCreateGame() {
     // Add first human player
     const availableLetters = LETTERS.filter(l => l !== botLetter);
     const playerLetter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
-
     const [player] = await db
       .insert(players)
       .values({
@@ -120,12 +130,11 @@ export async function findOrCreateGame() {
       })
       .returning();
 
-    console.log('Added first player with letter:', playerLetter);
-    console.log('Returning queue state for new game');
+    console.log('New game created with bot and first player. Bot:', botLetter, 'Player:', playerLetter);
 
     return {
       queueState: {
-        playersInQueue: 1,
+        playersInQueue: 2, // Bot + First player
         estimatedWaitTime: BASE_WAIT_TIME
       }
     };

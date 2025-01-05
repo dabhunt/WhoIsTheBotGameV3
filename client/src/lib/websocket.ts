@@ -45,27 +45,18 @@ export const useGameState = create<GameState>((set, get) => ({
         currentWs.close();
       }
 
+      console.log('Connecting to WebSocket for game:', gameId, 'as player:', letter);
+
       // Construct WebSocket URL
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       const wsUrl = `${protocol}//${host}/ws?gameId=${gameId}&letter=${letter}`;
-      console.log('Connecting to WebSocket:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         set({ connected: true });
-      };
-
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        set({ connected: false });
-      };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        set({ connected: false });
       };
 
       ws.onmessage = (event) => {
@@ -83,49 +74,20 @@ export const useGameState = create<GameState>((set, get) => ({
                 messages: [...state.messages, data.message],
               }));
               break;
-
-            case 'gameState':
-              set((state) => {
-                const playerStates = new Map(state.playerStates);
-                playerStates.set(data.letter, {
-                  eliminated: !data.isCorrect,
-                  hasGuessed: true,
-                  timeRemaining: 30,
-                });
-
-                return {
-                  playerStates,
-                  gameOver: data.gameOver,
-                  winner: data.gameOver ? data.letter : null,
-                };
-              });
-              break;
-
-            case 'timer':
-              set((state) => {
-                const playerStates = new Map(state.playerStates);
-                const playerState = playerStates.get(data.letter) || {
-                  eliminated: false,
-                  hasGuessed: false,
-                  timeRemaining: data.timeRemaining,
-                };
-
-                playerStates.set(data.letter, {
-                  ...playerState,
-                  timeRemaining: data.timeRemaining,
-                  eliminated: data.timeRemaining <= 0 ? true : playerState.eliminated,
-                });
-
-                return { playerStates };
-              });
-              break;
-
-            default:
-              console.warn('Unknown message type:', data.type);
           }
         } catch (error) {
           console.error('Error processing WebSocket message:', error);
         }
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        set({ connected: false });
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        set({ connected: false });
       };
 
       set({ ws });
