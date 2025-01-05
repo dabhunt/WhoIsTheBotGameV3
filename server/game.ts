@@ -50,7 +50,7 @@ async function cleanupStaleGames() {
       }
     }
 
-    // Also cleanup stale waiting players using Array.from() to avoid TypeScript iteration error
+    // Cleanup stale waiting players
     const staleWaitingPlayers = Array.from(waitingPlayers.entries())
       .filter(([_, player]) => player.timestamp < staleTime)
       .map(([id]) => id);
@@ -101,7 +101,7 @@ async function createGameWithBot(): Promise<{ id: number; botLetter: string }> {
     return { id: game.id, botLetter };
   });
 
-  // Initialize active game state with bot counted as first player
+  // Initialize game state
   activeGames.set(result.id, {
     status: 'waiting',
     playerCount: 1, // Bot counts as first player
@@ -142,8 +142,13 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
     const currentWaitingCount = getWaitingPlayersCount();
     logMatchmaking('Current waiting players', { requestId, count: currentWaitingCount });
 
-    // If we don't have exactly REQUIRED_HUMAN_PLAYERS waiting, return queue state
+    // Return queue state if we don't have exactly 2 players
     if (currentWaitingCount < REQUIRED_HUMAN_PLAYERS) {
+      logMatchmaking('Not enough players, returning queue state', { 
+        requestId, 
+        currentCount: currentWaitingCount,
+        required: REQUIRED_HUMAN_PLAYERS 
+      });
       return {
         queueState: {
           playersInQueue: currentWaitingCount,
@@ -152,9 +157,13 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
       };
     }
 
-    // Check if we can create a new game (enough time passed since last creation)
+    // Check if we can create a new game
     const now = Date.now();
     if (now - lastGameCreationTime < MIN_GAME_CREATION_INTERVAL) {
+      logMatchmaking('Too soon to create game, waiting', { 
+        requestId,
+        timeRemaining: MIN_GAME_CREATION_INTERVAL - (now - lastGameCreationTime)
+      });
       return {
         queueState: {
           playersInQueue: currentWaitingCount,
@@ -163,20 +172,18 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
       };
     }
 
-    // Get the first two waiting players (FIFO)
+    // Get exactly 2 waiting players (FIFO)
     const waitingPlayersList = Array.from(waitingPlayers.entries())
       .sort((a, b) => a[1].timestamp - b[1].timestamp)
       .slice(0, REQUIRED_HUMAN_PLAYERS)
       .map(([id]) => id);
 
-    // Create a new game with bot
+    // Create game with bot
     const { id: gameId, botLetter } = await createGameWithBot();
     lastGameCreationTime = now;
 
     try {
-      // Add the human players
       const result = await db.transaction(async (tx) => {
-        // Get game state
         const game = await tx.query.games.findFirst({
           where: eq(games.id, gameId),
           with: {
@@ -202,7 +209,7 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
           });
         }
 
-        // Set game as active since we have all players
+        // Set game as active
         await tx.update(games)
           .set({ status: 'active' })
           .where(eq(games.id, gameId));
@@ -223,6 +230,12 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
         gameState.playerCount = MAX_PLAYERS;
         gameState.lastUpdated = Date.now();
       }
+
+      logMatchmaking('Game created successfully', { 
+        requestId,
+        gameId: result.gameId,
+        playerCount: MAX_PLAYERS
+      });
 
       return result;
 
