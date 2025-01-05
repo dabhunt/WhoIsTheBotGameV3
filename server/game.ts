@@ -1,33 +1,30 @@
 import { db } from '@db';
 import { games, players } from '@db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const MAX_PLAYERS = 8;
+const BASE_WAIT_TIME = 15; // base wait time in seconds
 
 export async function findOrCreateGame() {
   // Look for an available game
   const waitingGame = await db.query.games.findFirst({
-    where: eq(games.status, 'waiting')
+    where: eq(games.status, 'waiting'),
   });
 
   if (waitingGame) {
-    const playerCount = await db.query.players.count({
-      where: eq(players.gameId, waitingGame.id)
-    });
+    const playerRows = await db.select()
+      .from(players)
+      .where(eq(players.gameId, waitingGame.id));
+
+    const playerCount = playerRows.length;
 
     if (playerCount < MAX_PLAYERS) {
       // Assign random unused letter
-      const usedLetters = await db.select()
-        .from(players)
-        .where(eq(players.gameId, waitingGame.id));
-      
-      const availableLetters = LETTERS.filter(
-        l => !usedLetters.find(p => p.letter === l)
-      );
-      
+      const usedLetters = playerRows.map(p => p.letter);
+      const availableLetters = LETTERS.filter(l => !usedLetters.includes(l));
       const letter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
-      
+
       const [player] = await db.insert(players)
         .values({
           gameId: waitingGame.id,
@@ -36,11 +33,21 @@ export async function findOrCreateGame() {
         })
         .returning();
 
-      if (playerCount === MAX_PLAYERS - 1) {
-        await db.update(games)
-          .set({ status: 'active' })
-          .where(eq(games.id, waitingGame.id));
+      // If we're not at max players yet, return queue state
+      if (playerCount < MAX_PLAYERS - 1) {
+        const estimatedWaitTime = BASE_WAIT_TIME * (MAX_PLAYERS - playerCount - 1);
+        return {
+          queueState: {
+            playersInQueue: playerCount + 1,
+            estimatedWaitTime
+          }
+        };
       }
+
+      // If this was the last player needed, start the game
+      await db.update(games)
+        .set({ status: 'active' })
+        .where(eq(games.id, waitingGame.id));
 
       return {
         gameId: waitingGame.id,
@@ -53,7 +60,10 @@ export async function findOrCreateGame() {
   // Create new game
   const botLetter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
   const [game] = await db.insert(games)
-    .values({ botLetter })
+    .values({ 
+      status: 'waiting',
+      botLetter 
+    })
     .returning();
 
   // Add bot player
@@ -74,9 +84,11 @@ export async function findOrCreateGame() {
     })
     .returning();
 
+  // Return queue state since we need more players
   return {
-    gameId: game.id,
-    playerId: player.id,
-    letter: playerLetter
+    queueState: {
+      playersInQueue: 2,
+      estimatedWaitTime: BASE_WAIT_TIME * (MAX_PLAYERS - 2)
+    }
   };
 }

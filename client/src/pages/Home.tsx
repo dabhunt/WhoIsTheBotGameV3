@@ -1,26 +1,12 @@
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useQueueStore } from '@/lib/queue';
+import { Loader2 } from 'lucide-react';
 
 export function Home() {
   const [, setLocation] = useLocation();
-
-  const handlePlay = async () => {
-    try {
-      const response = await fetch('/api/games/join', {
-        method: 'POST'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to join game');
-      }
-
-      const { gameId, letter } = await response.json();
-      setLocation(`/game/${gameId}?letter=${letter}`);
-    } catch (error) {
-      console.error('Failed to join game:', error);
-    }
-  };
+  const { inQueue, playersInQueue, estimatedWaitTime, joinQueue, leaveQueue } = useQueueStore();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 flex items-center justify-center p-4">
@@ -43,13 +29,37 @@ export function Home() {
             </ul>
           </div>
 
-          <Button
-            onClick={handlePlay}
-            size="lg"
-            className="w-full"
-          >
-            Play Now
-          </Button>
+          {inQueue ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Finding a game...</span>
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  Players in queue: {playersInQueue}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Estimated wait time: {estimatedWaitTime}s
+                </p>
+              </div>
+              <Button
+                onClick={leaveQueue}
+                variant="outline"
+                className="w-full"
+              >
+                Leave Queue
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={joinQueue}
+              size="lg"
+              className="w-full"
+            >
+              Play Now
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>

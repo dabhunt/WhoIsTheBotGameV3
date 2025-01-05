@@ -1,8 +1,9 @@
 import { WebSocket, WebSocketServer } from 'ws';
+import { IncomingMessage } from 'http';
 import type { Server } from 'http';
 import { db } from '@db';
 import { games, players, messages } from '@db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { handleBotMessage } from './bot';
 
 interface GameState {
@@ -15,9 +16,9 @@ const gameStates = new Map<number, GameState>();
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ 
     server,
-    verifyClient: (info) => {
+    verifyClient: ({ req }: { req: IncomingMessage }) => {
       // Ignore Vite HMR connections
-      const protocol = info.req.headers['sec-websocket-protocol'];
+      const protocol = req.headers['sec-websocket-protocol'];
       return protocol !== 'vite-hmr';
     }
   });
@@ -41,7 +42,8 @@ export function setupWebSocket(server: Server) {
     gameState.clients.set(letter, ws);
 
     // Send existing messages
-    const existingMessages = await db.select().from(messages)
+    const existingMessages = await db.select()
+      .from(messages)
       .where(eq(messages.gameId, gameId))
       .orderBy(messages.createdAt);
 
@@ -111,16 +113,34 @@ export function setupWebSocket(server: Server) {
 
           const isCorrect = message.guessedLetter === game.botLetter;
 
+          // Update player status
           await db.update(players)
-            .set({ hasGuessed: true, eliminated: !isCorrect })
-            .where(eq(players.gameId, gameId))
-            .where(eq(players.letter, letter));
+            .set({ 
+              hasGuessed: true, 
+              eliminated: !isCorrect 
+            })
+            .where(
+              and(
+                eq(players.gameId, gameId),
+                eq(players.letter, letter)
+              )
+            );
 
           if (isCorrect) {
+            // Update game status when correct guess is made
+            const [player] = await db.select()
+              .from(players)
+              .where(
+                and(
+                  eq(players.gameId, gameId),
+                  eq(players.letter, letter)
+                )
+              );
+
             await db.update(games)
               .set({ 
                 status: 'finished',
-                winnerPlayerId: message.playerId 
+                winnerPlayerId: player.id
               })
               .where(eq(games.id, gameId));
           }
