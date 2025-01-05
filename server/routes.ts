@@ -1,7 +1,9 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupWebSocket } from "./ws.js";
 import { findOrCreateGame } from "./game.js";
+import { requestLogger } from "./utils/logger.js";
+import { MatchmakingError } from "./utils/logger.js";
 
 export function registerRoutes(app: Express): Server {
   // Create HTTP server first
@@ -10,23 +12,35 @@ export function registerRoutes(app: Express): Server {
   // Setup WebSocket with the server
   setupWebSocket(httpServer);
 
-  // Game matchmaking endpoint
-  app.post('/api/games/join', async (req, res) => {
-    const requestId = Math.random().toString(36).substring(7);
-    console.log(`[${requestId}] Received join game request`);
+  // Add request logging middleware
+  app.use(requestLogger);
 
+  // Game matchmaking endpoint
+  app.post('/api/games/join', async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Get or create a game session
       const result = await findOrCreateGame();
-      console.log(`[${requestId}] Game match result:`, result);
       res.json(result);
     } catch (error) {
-      console.error(`[${requestId}] Join game error:`, error);
-      res.status(500).json({ 
-        error: 'Failed to join game',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      });
+      if (error instanceof MatchmakingError) {
+        res.status(error.statusCode).json({ 
+          error: error.code,
+          message: error.message,
+          context: error.context
+        });
+      } else {
+        next(error);
+      }
     }
+  });
+
+  // Error handling middleware
+  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ 
+      error: 'INTERNAL_SERVER_ERROR',
+      message: 'An unexpected error occurred'
+    });
   });
 
   return httpServer;

@@ -9,7 +9,12 @@ interface QueueState {
   joinQueue: () => Promise<void>;
   leaveQueue: () => void;
   setGameData: (data: { gameId: number; letter: string } | null) => void;
+  retryCount: number;
+  isTransitioning: boolean;
 }
+
+const MAX_RETRY_COUNT = 3;
+const POLL_INTERVAL = 3000;
 
 export const useQueueStore = create<QueueState>((set, get) => {
   let pollIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -27,6 +32,8 @@ export const useQueueStore = create<QueueState>((set, get) => {
     playersInQueue: 0,
     estimatedWaitTime: 30,
     gameData: null,
+    retryCount: 0,
+    isTransitioning: false,
 
     joinQueue: async () => {
       try {
@@ -37,7 +44,8 @@ export const useQueueStore = create<QueueState>((set, get) => {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to join queue');
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to join queue');
         }
 
         const data = await response.json();
@@ -49,6 +57,8 @@ export const useQueueStore = create<QueueState>((set, get) => {
           clearPollInterval();
           set({ 
             inQueue: false,
+            retryCount: 0,
+            isTransitioning: true,
             gameData: {
               gameId: data.gameId,
               letter: data.letter
@@ -59,13 +69,15 @@ export const useQueueStore = create<QueueState>((set, get) => {
           console.log('Entering queue with state:', data.queueState);
           set({ 
             inQueue: true,
+            retryCount: 0,
+            isTransitioning: false,
             playersInQueue: data.queueState.playersInQueue,
             estimatedWaitTime: data.queueState.estimatedWaitTime
           });
 
           // Start polling for game status
           pollIntervalId = setInterval(async () => {
-            if (!get().inQueue) {
+            if (!get().inQueue || get().isTransitioning) {
               clearPollInterval();
               return;
             }
@@ -78,7 +90,12 @@ export const useQueueStore = create<QueueState>((set, get) => {
               });
 
               if (!pollResponse.ok) {
-                throw new Error('Failed to poll queue status');
+                const retryCount = get().retryCount + 1;
+                if (retryCount >= MAX_RETRY_COUNT) {
+                  throw new Error('Failed to poll queue status after multiple retries');
+                }
+                set({ retryCount });
+                return;
               }
 
               const pollData = await pollResponse.json();
@@ -89,6 +106,8 @@ export const useQueueStore = create<QueueState>((set, get) => {
                 clearPollInterval();
                 set({ 
                   inQueue: false,
+                  retryCount: 0,
+                  isTransitioning: true,
                   gameData: {
                     gameId: pollData.gameId,
                     letter: pollData.letter
@@ -97,21 +116,35 @@ export const useQueueStore = create<QueueState>((set, get) => {
               } else if (pollData.queueState) {
                 console.log('Updated queue state:', pollData.queueState);
                 set({
+                  retryCount: 0,
                   playersInQueue: pollData.queueState.playersInQueue,
                   estimatedWaitTime: pollData.queueState.estimatedWaitTime
                 });
               }
             } catch (error) {
               console.error('Queue polling error:', error);
-              clearPollInterval();
-              set({ inQueue: false });
+              const retryCount = get().retryCount + 1;
+              if (retryCount >= MAX_RETRY_COUNT) {
+                clearPollInterval();
+                set({ 
+                  inQueue: false, 
+                  retryCount: 0,
+                  isTransitioning: false 
+                });
+              } else {
+                set({ retryCount });
+              }
             }
-          }, 3000); // Poll every 3 seconds
+          }, POLL_INTERVAL);
         }
       } catch (error) {
         console.error('Failed to join queue:', error);
         clearPollInterval();
-        set({ inQueue: false });
+        set({ 
+          inQueue: false, 
+          retryCount: 0,
+          isTransitioning: false 
+        });
       }
     },
 
@@ -122,13 +155,18 @@ export const useQueueStore = create<QueueState>((set, get) => {
         inQueue: false, 
         playersInQueue: 0, 
         estimatedWaitTime: 30,
-        gameData: null 
+        gameData: null,
+        retryCount: 0,
+        isTransitioning: false
       });
     },
 
     setGameData: (data) => {
       console.log('Setting game data:', data);
-      set({ gameData: data });
+      set({ 
+        gameData: data,
+        isTransitioning: false
+      });
     }
   };
 });
