@@ -11,11 +11,12 @@ interface QueueState {
   setGameData: (data: { gameId: number; letter: string } | null) => void;
 }
 
-export const useQueueStore = create<QueueState>((set) => {
+export const useQueueStore = create<QueueState>((set, get) => {
   let pollIntervalId: ReturnType<typeof setInterval> | null = null;
 
   const clearPollInterval = () => {
     if (pollIntervalId) {
+      console.log('Clearing poll interval');
       clearInterval(pollIntervalId);
       pollIntervalId = null;
     }
@@ -43,7 +44,7 @@ export const useQueueStore = create<QueueState>((set) => {
 
         if (data.gameId && data.letter) {
           // Game is ready immediately
-          console.log('Game is ready, transitioning to game page with:', data);
+          console.log('Game is ready immediately:', data);
           clearPollInterval();
           set({ 
             inQueue: false,
@@ -64,6 +65,7 @@ export const useQueueStore = create<QueueState>((set) => {
           // Start polling for game status
           pollIntervalId = setInterval(async () => {
             try {
+              console.log('Polling for game status...');
               const pollResponse = await fetch('/api/games/join', {
                 method: 'POST',
                 credentials: 'include'
@@ -77,7 +79,7 @@ export const useQueueStore = create<QueueState>((set) => {
               console.log('Poll response:', pollData);
 
               if (pollData.gameId && pollData.letter) {
-                console.log('Game found from poll, transitioning to game page');
+                console.log('Game found from poll:', pollData);
                 clearPollInterval();
                 set({ 
                   inQueue: false,

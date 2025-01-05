@@ -12,14 +12,24 @@ export function Home() {
   // Handle navigation when game data is available
   useEffect(() => {
     if (gameData) {
-      console.log('Navigating to game page with:', gameData);
+      console.log('Game data available, preparing for navigation:', gameData);
       const gameRoute = `/game/${gameData.gameId}?letter=${gameData.letter}`;
-      console.log('Routing to:', gameRoute);
+      console.log('Navigating to:', gameRoute);
+
+      // Navigate first
       setLocation(gameRoute);
-      // Only reset game data after successful navigation
-      setTimeout(() => {
+
+      // Clear game data after a delay to ensure navigation completes
+      const timeoutId = setTimeout(() => {
+        console.log('Navigation complete, clearing game data');
         useQueueStore.getState().setGameData(null);
-      }, 100);
+      }, 500);
+
+      // Properly clear the timeout on cleanup
+      return () => {
+        console.log('Cleaning up navigation timeout');
+        clearTimeout(timeoutId);
+      };
     }
   }, [gameData, setLocation]);
 
