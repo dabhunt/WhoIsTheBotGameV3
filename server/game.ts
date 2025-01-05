@@ -49,7 +49,7 @@ async function findAvailableGame(): Promise<number | undefined> {
   const entries = Array.from(activeGames.entries());
   for (const [gameId, state] of entries) {
     // Only return game if it's waiting and has room for more players
-    if (state.status === 'waiting' && state.playerCount < MAX_PLAYERS && !state.locked) {
+    if (state.status === 'waiting' && state.playerCount < MAX_PLAYERS - 1 && !state.locked) {
       state.locked = true; // Lock the game while we try to join
       return gameId;
     }
@@ -73,13 +73,17 @@ export async function findOrCreateGame() {
     if (!gameId) {
       const now = Date.now();
       if (now - lastGameCreationTime < MIN_GAME_CREATION_INTERVAL) {
-        logMatchmaking('Too soon to create new game', {
+        logMatchmaking('Too soon to create new game, returning queue state', {
           requestId,
           waitTime: MIN_GAME_CREATION_INTERVAL - (now - lastGameCreationTime)
         });
+
+        // Return queue state for waiting
         return {
           queueState: {
-            playersInQueue: 1,
+            playersInQueue: Array.from(activeGames.values())
+              .filter(g => g.status === 'waiting')
+              .reduce((sum, g) => sum + g.playerCount, 0),
             estimatedWaitTime: BASE_WAIT_TIME
           }
         };
@@ -115,7 +119,7 @@ export async function findOrCreateGame() {
         lastGameCreationTime = now;
         gameId = result.id;
 
-        // Initialize active game state
+        // Initialize active game state with bot counted as first player
         activeGames.set(gameId, {
           status: 'waiting',
           playerCount: 1, // Bot counts as first player
@@ -123,7 +127,7 @@ export async function findOrCreateGame() {
           locked: true, // Lock new game immediately
         });
 
-        logGameState('Created new game', {
+        logGameState('Created new game with bot', {
           requestId,
           gameId,
           botLetter: result.botLetter
@@ -142,6 +146,7 @@ export async function findOrCreateGame() {
     // Try to join the game
     try {
       const result = await db.transaction(async (tx) => {
+        // Get current game state
         const game = await tx.query.games.findFirst({
           where: eq(games.id, gameId!),
           with: {
@@ -158,7 +163,16 @@ export async function findOrCreateGame() {
           );
         }
 
-        // Get available letter
+        // Verify we don't exceed MAX_PLAYERS (including bot)
+        if (game.players.length >= MAX_PLAYERS) {
+          throw new MatchmakingError(
+            'Game is full',
+            ErrorCodes.GAME_FULL,
+            400
+          );
+        }
+
+        // Get available letter (excluding bot's letter)
         const usedLetters = game.players.map(p => p.letter);
         const availableLetters = LETTERS.filter(l => 
           !usedLetters.includes(l) && 
@@ -173,6 +187,7 @@ export async function findOrCreateGame() {
           );
         }
 
+        // Assign next available letter
         const letter = availableLetters[0];
         const [player] = await tx
           .insert(players)
@@ -183,49 +198,51 @@ export async function findOrCreateGame() {
           })
           .returning();
 
-        let gameState = activeGames.get(game.id);
-        if (gameState) {
-          // Update player count and timestamp
-          gameState.playerCount = game.players.length + 1; // Include the new player
-          gameState.lastUpdated = Date.now();
+        // Update game state
+        const gameState = activeGames.get(game.id);
+        if (!gameState) {
+          throw new MatchmakingError(
+            'Game state not found',
+            ErrorCodes.INVALID_STATE,
+            500
+          );
+        }
 
-          // Only transition to active state if we have all players (2 humans + 1 bot)
-          if (gameState.playerCount >= MAX_PLAYERS) {
-            gameState.status = 'active';
-            await tx
-              .update(games)
-              .set({ status: 'active' })
-              .where(eq(games.id, game.id))
-              .execute();
+        // Update player count and timestamp
+        gameState.playerCount = game.players.length + 1; // Include the new player
+        gameState.lastUpdated = Date.now();
 
-            logGameState('Game is full, activating', {
-              requestId,
-              gameId: game.id,
-              playerCount: gameState.playerCount
-            });
+        // Check if game is now full (2 humans + 1 bot)
+        if (gameState.playerCount >= MAX_PLAYERS) {
+          logGameState('Game is full, transitioning to active', {
+            requestId,
+            gameId: game.id,
+            playerCount: gameState.playerCount
+          });
 
-            // Unlock the game and return game data
-            gameState.locked = false;
-            return {
-              gameId: game.id,
-              letter
-            };
-          }
+          // Update game status in database and memory
+          await tx
+            .update(games)
+            .set({ status: 'active' })
+            .where(eq(games.id, game.id))
+            .execute();
 
-          // If not full, unlock and return queue state
+          gameState.status = 'active';
           gameState.locked = false;
+
+          // Return game data since it's ready to start
           return {
-            queueState: {
-              playersInQueue: gameState.playerCount,
-              estimatedWaitTime: BASE_WAIT_TIME
-            }
+            gameId: game.id,
+            letter,
+            playersInGame: gameState.playerCount
           };
         }
 
-        // Return queue state if game state not found
+        // Game not full yet, return queue state
+        gameState.locked = false;
         return {
           queueState: {
-            playersInQueue: 1,
+            playersInQueue: gameState.playerCount,
             estimatedWaitTime: BASE_WAIT_TIME
           }
         };
@@ -243,6 +260,7 @@ export async function findOrCreateGame() {
       if (error instanceof MatchmakingError) {
         throw error;
       }
+
       logError('Failed to join game', { error: error as Error });
       throw new MatchmakingError(
         'Failed to join game',
