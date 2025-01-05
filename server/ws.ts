@@ -19,7 +19,22 @@ export function setupWebSocket(server: Server) {
     verifyClient: ({ req }: { req: IncomingMessage }) => {
       // Skip verification for Vite HMR
       const protocol = req.headers['sec-websocket-protocol'];
-      return protocol !== 'vite-hmr';
+      if (protocol === 'vite-hmr') {
+        return false;
+      }
+
+      // Validate game ID and letter params
+      const [, search] = (req.url || '').split('?');
+      const params = new URLSearchParams(search || '');
+      const gameId = parseInt(params.get('gameId') || '');
+      const letter = params.get('letter');
+
+      if (!gameId || !letter) {
+        console.error('Invalid WebSocket connection params:', { gameId, letter });
+        return false;
+      }
+
+      return true;
     }
   });
 
@@ -32,12 +47,23 @@ export function setupWebSocket(server: Server) {
       const letter = params.get('letter');
 
       if (!gameId || !letter) {
-        console.error('Invalid WebSocket connection params:', { gameId, letter });
+        console.error('Missing connection params:', { gameId, letter });
         ws.close();
         return;
       }
 
       console.log('WebSocket connected for game:', gameId, 'player:', letter);
+
+      // Verify game exists and is active
+      const game = await db.query.games.findFirst({
+        where: eq(games.id, gameId),
+      });
+
+      if (!game || game.status !== 'active') {
+        console.error('Invalid game state:', game);
+        ws.close();
+        return;
+      }
 
       // Initialize or get game state
       let gameState = gameStates.get(gameId);
@@ -58,7 +84,10 @@ export function setupWebSocket(server: Server) {
         .where(eq(messages.gameId, gameId))
         .orderBy(messages.createdAt);
 
-      ws.send(JSON.stringify({ type: 'history', messages: existingMessages }));
+      ws.send(JSON.stringify({ 
+        type: 'history', 
+        messages: existingMessages 
+      }));
 
       // Handle incoming messages
       ws.on('message', async (data) => {
@@ -89,7 +118,7 @@ export function setupWebSocket(server: Server) {
             });
           }
         } catch (error) {
-          console.error('WebSocket message error:', error);
+          console.error('Message handling error:', error);
         }
       });
 
@@ -101,6 +130,7 @@ export function setupWebSocket(server: Server) {
           gameStates.delete(gameId);
         }
       });
+
     } catch (error) {
       console.error('WebSocket connection error:', error);
       ws.close();
