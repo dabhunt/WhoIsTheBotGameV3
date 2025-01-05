@@ -4,6 +4,7 @@ import type { Server } from 'http';
 import { db } from '@db';
 import { games, players, messages } from '@db/schema';
 import { eq } from 'drizzle-orm';
+import { botChatService } from './services/bot.js';
 
 interface Message {
   id: number;
@@ -15,6 +16,7 @@ interface Message {
 interface GameState {
   gameId: number;
   clients: Map<string, WebSocket>;
+  botInitialized?: boolean;
 }
 
 const gameStates = new Map<number, GameState>();
@@ -80,7 +82,8 @@ export function setupWebSocket(server: Server) {
       if (!gameState) {
         gameState = { 
           gameId, 
-          clients: new Map()
+          clients: new Map(),
+          botInitialized: false
         };
         gameStates.set(gameId, gameState);
       }
@@ -88,25 +91,47 @@ export function setupWebSocket(server: Server) {
       // Add client to game state
       gameState.clients.set(letter, ws);
 
-      // Convert players array to map for easier state management
-      const playerStates = new Map();
-      game.players.forEach(player => {
-        // Initialize time remaining for all non-eliminated players
-        const timeRemaining = !player.eliminated ? 30 : 0;
+      // Initialize bot chat if not already done
+      if (!gameState.botInitialized && game.status === 'active') {
+        gameState.botInitialized = true;
+        const botPlayer = game.players.find(p => p.isBot);
+        if (botPlayer) {
+          botChatService.startBotChat(gameId, game.botLetter, async (content) => {
+            // Save bot message to database
+            const [newMessage] = await db.insert(messages)
+              .values({
+                gameId,
+                playerLetter: game.botLetter,
+                content
+              })
+              .returning();
 
-        playerStates.set(player.letter, {
-          eliminated: player.eliminated,
-          hasGuessed: player.hasGuessed,
-          isBot: player.isBot,
-          timeRemaining
-        });
-      });
+            // Broadcast bot message to all clients
+            const broadcast = JSON.stringify({
+              type: 'message',
+              message: newMessage
+            });
+
+            gameState?.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(broadcast);
+              }
+            });
+          });
+        }
+      }
 
       // Send initial game state
       ws.send(JSON.stringify({
         type: 'gameState',
         state: {
-          players: Object.fromEntries(playerStates),
+          players: game.players.map(p => ({
+            letter: p.letter,
+            eliminated: p.eliminated,
+            hasGuessed: p.hasGuessed,
+            isBot: p.isBot,
+            timeRemaining: !p.eliminated ? 30 : 0
+          })),
           gameOver: game.status === 'finished',
           winner: game.winnerPlayerId ? 
             (game.players.find(p => p.id === game.winnerPlayerId)?.letter || null) : null
@@ -140,28 +165,13 @@ export function setupWebSocket(server: Server) {
               })
               .returning();
 
-            // Reset timer for the player who sent the message
-            const playerState = playerStates.get(letter);
-            if (playerState && !playerState.eliminated) {
-              playerState.timeRemaining = 30;
-
-              // Broadcast updated game state to all clients
-              const gameStateUpdate = JSON.stringify({
-                type: 'gameState',
-                state: {
-                  players: Object.fromEntries(playerStates),
-                  gameOver: game.status === 'finished',
-                  winner: game.winnerPlayerId ? 
-                    (game.players.find(p => p.id === game.winnerPlayerId)?.letter || null) : null
-                }
-              });
-
-              gameState?.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                  client.send(gameStateUpdate);
-                }
-              });
-            }
+            // Add message to bot chat history
+            botChatService.addMessage(gameId, {
+              gameId,
+              playerLetter: letter,
+              content: message.content,
+              timestamp: new Date()
+            });
 
             // Broadcast message to all clients
             const broadcast = JSON.stringify({
@@ -184,7 +194,10 @@ export function setupWebSocket(server: Server) {
       ws.on('close', () => {
         console.log('WebSocket disconnected for game:', gameId, 'player:', letter);
         gameState?.clients.delete(letter);
+
+        // If all clients disconnected, clean up game state and stop bot
         if (gameState?.clients.size === 0) {
+          botChatService.stopBotChat(gameId);
           gameStates.delete(gameId);
         }
       });

@@ -52,7 +52,7 @@ export const useQueueStore = create<QueueState>((set, get) => {
         console.log('Join queue response:', data);
 
         if (data.gameId && data.letter) {
-          // Game is ready immediately (unlikely with new 2-player requirement)
+          // Game is ready immediately
           console.log('Game is ready immediately:', data);
           clearPollInterval();
           set({ 
@@ -128,6 +128,11 @@ export const useQueueStore = create<QueueState>((set, get) => {
                   retryCount: 0,
                   isTransitioning: false 
                 });
+                useToast().toast({
+                  title: "Error",
+                  description: "Lost connection to queue. Please try again.",
+                  variant: "destructive"
+                });
               } else {
                 set({ retryCount });
               }
@@ -141,6 +146,11 @@ export const useQueueStore = create<QueueState>((set, get) => {
           inQueue: false, 
           retryCount: 0,
           isTransitioning: false 
+        });
+        useToast().toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to join queue",
+          variant: "destructive"
         });
       }
     },
