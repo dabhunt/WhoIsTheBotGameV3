@@ -1,6 +1,6 @@
 import { db } from '@db/index.js';
 import { games, players } from '@db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, and, count, lt } from 'drizzle-orm';
 
 const LETTERS = ['A', 'B', 'C'];  // Only need 3 letters now: 2 players + 1 bot
 const MAX_PLAYERS = 3; // 2 players + 1 bot
@@ -10,59 +10,64 @@ export async function findOrCreateGame() {
   try {
     console.log('Searching for available game...');
 
-    // Look for an available game
-    const waitingGame = await db.query.games.findFirst({
-      where: eq(games.status, 'waiting'),
-    });
+    // Get all waiting games and their player counts
+    const waitingGamesWithCounts = await db
+      .select({
+        gameId: games.id,
+        botLetter: games.botLetter,
+        playerCount: count()
+      })
+      .from(games)
+      .leftJoin(players, eq(games.id, players.gameId))
+      .where(eq(games.status, 'waiting'))
+      .groupBy(games.id);
 
-    if (waitingGame) {
-      console.log('Found waiting game:', waitingGame.id);
+    // Filter for games that aren't full
+    const availableGame = waitingGamesWithCounts.find(g => g.playerCount < MAX_PLAYERS);
 
-      const playerRows = await db.select()
+    if (availableGame) {
+      console.log('Found waiting game:', availableGame.gameId, 'with', availableGame.playerCount, 'players');
+
+      // Get existing players to find available letters
+      const existingPlayers = await db.select()
         .from(players)
-        .where(eq(players.gameId, waitingGame.id));
+        .where(eq(players.gameId, availableGame.gameId));
 
-      const playerCount = playerRows.length;
-      console.log('Current players in game:', playerCount);
+      const usedLetters = existingPlayers.map(p => p.letter);
+      const availableLetters = LETTERS.filter(l => !usedLetters.includes(l));
+      const letter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
 
-      if (playerCount < MAX_PLAYERS) {
-        // Assign random unused letter
-        const usedLetters = playerRows.map(p => p.letter);
-        const availableLetters = LETTERS.filter(l => !usedLetters.includes(l));
-        const letter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
+      console.log('Assigning letter:', letter);
 
-        console.log('Assigning letter:', letter);
+      const [player] = await db.insert(players)
+        .values({
+          gameId: availableGame.gameId,
+          letter,
+          isBot: false
+        })
+        .returning();
 
-        const [player] = await db.insert(players)
-          .values({
-            gameId: waitingGame.id,
-            letter,
-            isBot: false
-          })
-          .returning();
+      // If this was the last player needed, start the game
+      if (availableGame.playerCount === MAX_PLAYERS - 1) {
+        console.log('Starting game with ID:', availableGame.gameId);
 
-        // If this was the last player needed, start the game
-        if (playerCount === MAX_PLAYERS - 2) { // Start game when second player joins
-          console.log('Starting game with ID:', waitingGame.id);
+        await db.update(games)
+          .set({ status: 'active' })
+          .where(eq(games.id, availableGame.gameId));
 
-          await db.update(games)
-            .set({ status: 'active' })
-            .where(eq(games.id, waitingGame.id));
-
-          return {
-            gameId: waitingGame.id,
-            letter: player.letter
-          };
-        }
-
-        // Return queue state while waiting for more players
         return {
-          queueState: {
-            playersInQueue: playerCount + 1,
-            estimatedWaitTime: BASE_WAIT_TIME
-          }
+          gameId: availableGame.gameId,
+          letter: player.letter
         };
       }
+
+      // Return queue state while waiting for more players
+      return {
+        queueState: {
+          playersInQueue: availableGame.playerCount + 1,
+          estimatedWaitTime: BASE_WAIT_TIME
+        }
+      };
     }
 
     console.log('Creating new game...');
