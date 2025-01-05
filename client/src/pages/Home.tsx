@@ -3,10 +3,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useQueueStore } from '@/lib/queue';
 import { Bot, Users, Target, Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
 
 export function Home() {
   const [, setLocation] = useLocation();
-  const { inQueue, playersInQueue, estimatedWaitTime, joinQueue, leaveQueue } = useQueueStore();
+  const { inQueue, playersInQueue, estimatedWaitTime, joinQueue, leaveQueue, gameData } = useQueueStore();
+
+  // Handle navigation when game data is available
+  useEffect(() => {
+    if (gameData) {
+      setLocation(`/game/${gameData.gameId}?letter=${gameData.letter}`);
+      useQueueStore.getState().setGameData(null); // Reset game data after navigation
+    }
+  }, [gameData, setLocation]);
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
