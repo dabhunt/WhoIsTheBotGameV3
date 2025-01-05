@@ -3,8 +3,8 @@ import { games, players } from '@db/schema.js';
 import { eq, and, count, lt } from 'drizzle-orm';
 
 const LETTERS = ['A', 'B', 'C'];  // Only need 3 letters now: 2 players + 1 bot
-const MAX_PLAYERS = 3; // 2 players + 1 bot
-const BASE_WAIT_TIME = 15; // base wait time in seconds
+const MAX_PLAYERS = 2; // Changed to 2 for testing (1 human + 1 bot)
+const BASE_WAIT_TIME = 30; // Fixed 30 second wait time
 
 export async function findOrCreateGame() {
   try {
@@ -72,7 +72,7 @@ export async function findOrCreateGame() {
 
     console.log('Creating new game...');
 
-    // Create new game
+    // Create new game with bot
     const botLetter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
     const [game] = await db.insert(games)
       .values({ 

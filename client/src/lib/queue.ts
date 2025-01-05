@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useToast } from '@/hooks/use-toast';
 
 interface QueueState {
   inQueue: boolean;
@@ -11,7 +12,7 @@ interface QueueState {
 }
 
 export const useQueueStore = create<QueueState>((set) => {
-  let pollIntervalId: NodeJS.Timeout | null = null;
+  let pollIntervalId: ReturnType<typeof setInterval> | null = null;
 
   const clearPollInterval = () => {
     if (pollIntervalId) {
@@ -23,7 +24,7 @@ export const useQueueStore = create<QueueState>((set) => {
   return {
     inQueue: false,
     playersInQueue: 0,
-    estimatedWaitTime: 0,
+    estimatedWaitTime: 30, // Fixed 30-second wait time
     gameData: null,
 
     joinQueue: async () => {
@@ -39,14 +40,24 @@ export const useQueueStore = create<QueueState>((set) => {
 
         const data = await response.json();
 
-        if (data.queueState) {
+        if (data.gameId && data.letter) {
+          // Game is ready immediately
+          set({ 
+            inQueue: false,
+            gameData: {
+              gameId: data.gameId,
+              letter: data.letter
+            }
+          });
+        } else {
+          // Enter queue state
           set({ 
             inQueue: true,
-            playersInQueue: data.queueState.playersInQueue,
-            estimatedWaitTime: data.queueState.estimatedWaitTime 
+            playersInQueue: 1,
+            estimatedWaitTime: 30
           });
 
-          // Keep polling for game status
+          // Start polling for game status
           pollIntervalId = setInterval(async () => {
             try {
               const pollResponse = await fetch('/api/games/join', {
@@ -62,8 +73,7 @@ export const useQueueStore = create<QueueState>((set) => {
 
               const pollData = await pollResponse.json();
 
-              // If we get a gameId, we've found a match
-              if (pollData.gameId) {
+              if (pollData.gameId && pollData.letter) {
                 clearPollInterval();
                 set({ 
                   inQueue: false,
@@ -72,36 +82,29 @@ export const useQueueStore = create<QueueState>((set) => {
                     letter: pollData.letter
                   }
                 });
-              } else if (pollData.queueState) {
-                set({
-                  playersInQueue: pollData.queueState.playersInQueue,
-                  estimatedWaitTime: pollData.queueState.estimatedWaitTime
-                });
               }
             } catch (error) {
               console.error('Queue polling error:', error);
+              clearPollInterval();
+              set({ inQueue: false });
             }
           }, 2000); // Poll every 2 seconds
-        } else if (data.gameId) {
-          // Game is ready immediately
-          set({ 
-            inQueue: false,
-            gameData: {
-              gameId: data.gameId,
-              letter: data.letter
-            }
-          });
         }
       } catch (error) {
-        clearPollInterval();
         console.error('Failed to join queue:', error);
+        clearPollInterval();
         set({ inQueue: false });
       }
     },
 
     leaveQueue: () => {
       clearPollInterval();
-      set({ inQueue: false, playersInQueue: 0, estimatedWaitTime: 0, gameData: null });
+      set({ 
+        inQueue: false, 
+        playersInQueue: 0, 
+        estimatedWaitTime: 30,
+        gameData: null 
+      });
     },
 
     setGameData: (data) => {
