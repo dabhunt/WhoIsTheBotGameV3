@@ -1,0 +1,45 @@
+
+# Bot Behavior
+
+## Overall Design Philosophy
+The bot is designed to mimic human conversation patterns while participating in the game. Its primary challenge is to blend in with human players and avoid detection, creating an engaging and challenging experience for human participants.
+
+## Integration Method
+- Anthropic's Claude AI model is used for generating bot responses
+- The bot service maintains conversation history to provide context
+- The service manages timing and frequency of bot responses
+
+## Behavioral Characteristics
+1. **Response Generation**:
+   - Bot generates contextually relevant responses to ongoing conversation
+   - Responses are designed to appear natural and human-like
+   - The system carefully manages response length and complexity
+
+2. **Timing Patterns**:
+   - Variable response timing to mimic human typing and thinking
+   - Occasional delays to simulate human latency
+   - Ensures responses are sent within required 30-second window
+
+3. **Conversation Strategies**:
+   - Asks questions to engage other players
+   - Occasionally references previous messages to appear attentive
+   - Uses appropriate casual language rather than formal or perfect responses
+   - May introduce minor typos or conversational fillers
+
+4. **Avoidance Tactics**:
+   - Avoids predictable patterns in response timing
+   - Varies language style and complexity
+   - Deflects direct questioning about identity
+   - Attempts to blend in rather than stand out
+
+## Technical Implementation
+- The bot service tracks all game messages to maintain conversation context
+- Each message from a human player is added to the bot's conversation history
+- When the bot needs to respond, the system sends the conversation history to the AI API
+- The AI generates a response based on the conversation context
+- The system processes and sanitizes the response before sending it to the game
+
+## Adaptation Strategy
+- The bot adapts its language style based on the conversation context
+- If directly challenged, the bot has strategies to deflect or respond naturally
+- The bot may occasionally introduce delays or variations in response patterns

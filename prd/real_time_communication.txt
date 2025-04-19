@@ -1,0 +1,79 @@
+
+# Real-Time Communication System
+
+## WebSocket Architecture
+The game relies on WebSockets for real-time bidirectional communication between clients and the server, enabling instant messaging and game state updates.
+
+## Connection Establishment
+1. **Connection Process**:
+   - WebSocket connection is initiated when player enters a game
+   - Connection URL includes game ID and player letter as parameters
+   - Server verifies these parameters before accepting connection
+   - Each player maintains a separate WebSocket connection
+
+2. **Connection Verification**:
+   - Server validates that game exists and is active
+   - Confirms player is legitimately part of the game
+   - Rejects invalid connection attempts
+
+## Message Types and Protocol
+1. **Server to Client Messages**:
+   - `gameState`: Updates on player status, eliminations, and game progression
+   - `message`: New chat messages from any player
+   - `history`: Initial load of previous messages
+   - `error`: Notification of errors or invalid actions
+
+2. **Client to Server Messages**:
+   - `chat`: Player-generated chat messages
+   - `guess`: Player's guess of bot identity
+   - `ping`: Connection health check
+
+3. **Message Format**:
+   ```typescript
+   {
+     type: 'message' | 'gameState' | 'history' | 'error' | 'chat' | 'guess' | 'ping',
+     // Additional data based on message type
+   }
+   ```
+
+## Game State Synchronization
+1. **Initial State**:
+   - When player connects, server sends:
+     - Complete game state (players, statuses)
+     - Chat history from beginning of game
+
+2. **Real-time Updates**:
+   - Player status changes (elimination, guessing)
+   - New messages from all participants
+   - Game over conditions and results
+
+3. **Consistency Handling**:
+   - Server is authoritative source of truth
+   - Client state is updated based on server messages
+   - Timestamp ordering for message sequence
+
+## Disconnection Handling
+1. **Temporary Disconnections**:
+   - System detects when a client disconnects
+   - Grace period for reconnection
+   - State is preserved during brief disconnections
+
+2. **Permanent Disconnections**:
+   - After timeout period, player may be marked as eliminated
+   - Game can continue with remaining players
+   - If too many players disconnect, game may end
+
+3. **Server Recovery**:
+   - In case of server issues, games can be recovered from database state
+   - Players may need to reconnect after server interruptions
+
+## Bot Integration
+1. **Bot Messages**:
+   - Bot responses come through the same WebSocket protocol
+   - Bot service maintains separate connection to WebSocket server
+   - To players, bot messages appear indistinguishable from human messages
+
+2. **Message Processing**:
+   - All messages are logged to database for history and analysis
+   - Bot service is notified of all messages to maintain conversation context
+   - Message sanitization occurs before broadcast

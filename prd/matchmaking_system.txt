@@ -1,0 +1,50 @@
+
+# Matchmaking System
+
+## Matchmaking Objectives
+- Create balanced games with exactly 2 human players and 1 AI bot
+- Minimize wait times for players in queue
+- Ensure stable game creation and initialization
+
+## Queue Management
+1. **Player Queue**:
+   - Players join a global waiting queue
+   - Queue operates on a First-In-First-Out (FIFO) basis
+   - Server maintains a list of waiting players with timestamps
+
+2. **Queue Status**:
+   - System tracks number of players currently in queue
+   - Provides estimated wait time to players
+   - Updates queue information in real-time
+
+## Game Creation Process
+1. The system requires exactly 2 human players for game creation
+2. When 2 players are available in the queue, game creation is initiated
+3. System enforces a minimum interval between game creations (5 seconds)
+4. Game creation follows these steps:
+   - New game record is created in database
+   - Bot letter is randomly assigned
+   - Bot player is added to the game
+   - Human players are assigned remaining letters
+   - Game status is set to "waiting"
+
+5. Once all players are added:
+   - Game status is updated to "active"
+   - Players are removed from waiting queue
+   - Players are redirected to game screen
+   - WebSocket connections are established
+
+## Edge Cases Handling
+1. **Timeout Management**:
+   - Stale games (inactive for 5 minutes) are automatically cleaned up
+   - Players who remain in queue too long are removed
+   - System recovers from disrupted matchmaking
+
+2. **Connection Issues**:
+   - Players who disconnect during matchmaking are removed from queue
+   - If a player fails to connect to game, the game may be terminated
+   - Remaining players return to queue with priority
+
+3. **Load Balancing**:
+   - System limits the rate of game creation to prevent overload
+   - Queue processing is designed to handle concurrent requests

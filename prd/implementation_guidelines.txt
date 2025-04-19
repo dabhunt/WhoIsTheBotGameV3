@@ -1,0 +1,69 @@
+
+# Implementation Guidelines
+
+## Technology Stack
+
+### Frontend
+- **Core Framework**: React 18+ with TypeScript
+- **Styling**: Tailwind CSS with custom components
+- **Component Library**: 
+  - Radix UI primitives for accessible components
+  - Custom UI components built on these primitives
+- **State Management**:
+  - Zustand for global application state
+  - React Query for server state and data fetching
+- **Routing**: Wouter for lightweight client-side navigation
+- **Real-time**: WebSocket client for game communication
+
+### Backend
+- **Server Framework**: Node.js with Express
+- **API Layer**: RESTful endpoints for game setup and matchmaking
+- **Real-time**: WebSocket server (ws library) for in-game communication
+- **Database**: SQL database with Drizzle ORM for type-safe queries
+- **AI Integration**: Anthropic Claude API for bot intelligence
+
+## Development Standards
+
+### Code Organization
+- **Frontend Structure**:
+  - `/components`: Reusable UI components
+  - `/components/ui`: Base UI component library
+  - `/pages`: Route-based page components
+  - `/lib`: Utility functions and state management
+  - `/hooks`: Custom React hooks
+
+- **Backend Structure**:
+  - `/server`: Main server code
+  - `/server/services`: Business logic services
+  - `/db`: Database schema and connection
+  - `/utils`: Utility functions
+
+### State Management
+- Use Zustand for simple, centralized state management
+- Create separate stores for logically distinct areas:
+  - Queue/matchmaking state
+  - Game state
+  - User preferences
+- Use React Query for server data fetching and caching
+
+### API Communication
+- REST API for initial game setup and matchmaking
+- WebSockets for all in-game real-time communication
+- Clear message protocols and types for WebSocket communication
+
+### Error Handling
+- Comprehensive error tracking and logging
+- Friendly user-facing error messages via toast notifications
+- Graceful failure handling and recovery
+
+### Performance Considerations
+- Optimize WebSocket message frequency and payload size
+- Implement efficient real-time updates with minimal overhead
+- Use React's memo and useCallback for performance-critical components
+- Implement proper cleanup for WebSocket connections
+
+## Deployment Considerations
+- Set up proper environment configuration for development/production
+- Configure WebSocket server to handle multiple concurrent games
+- Implement monitoring and logging for real-time game issues
+- Set up database migrations for schema updates

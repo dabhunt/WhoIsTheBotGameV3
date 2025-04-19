@@ -1,0 +1,26 @@
+
+# Who Is The Bot - Product Requirements Document
+
+## Overview
+"Who Is The Bot" is a multiplayer game that presents a unique twist on the Turing test. Players join a chat room where one participant is secretly an AI bot. The objective is to identify which participant is the bot through conversation while avoiding being eliminated.
+
+## Core Concept
+- **Players**: 2 human players + 1 AI bot
+- **Objective**: Correctly identify which participant is the AI bot
+- **Challenge**: The bot attempts to appear human, while humans try to appear more human than the bot
+
+## Key Features
+- Real-time multiplayer matchmaking
+- In-game text-based chat
+- Bot AI that attempts to mimic human conversation patterns
+- Time-limited interactions requiring player engagement
+- Elimination mechanics based on guessing
+- Winner determination based on correct identification
+
+## Target Audience
+- Players interested in AI and the Turing test concept
+- Casual gamers looking for a quick social deduction game
+- People interested in testing their ability to distinguish AI from humans
+
+## Value Proposition
+"Who Is The Bot" offers a unique social deduction experience that tests a player's ability to distinguish between human and AI responses. As AI becomes increasingly sophisticated, this game provides both entertainment and insight into how well AI can mimic human communication patterns.

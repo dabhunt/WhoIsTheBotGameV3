@@ -1,0 +1,46 @@
+
+# User Flow
+
+## Entry & Matchmaking
+1. User lands on the home page
+2. User reviews game rules and information
+3. User clicks "Play Now" to join the matchmaking queue
+4. System displays queue status and estimated wait time
+5. Once enough players are in queue (2 human players), the system creates a game
+6. Players are automatically assigned unique identifiers (letters A, B, C)
+7. One letter is secretly designated as the AI bot
+8. Players are redirected to the game screen
+
+## Gameplay
+1. Player sees the game interface with:
+   - Chat area for sending/receiving messages
+   - Player list showing all participants and their status
+   - Timer indicating how long until a message must be sent
+   - Game status information
+
+2. Communication Phase:
+   - Players must send at least one message every 30 seconds
+   - Players failing to meet this requirement are automatically eliminated
+   - The AI bot generates responses that attempt to appear human-like
+   - Players can analyze messages to determine who might be the bot
+
+3. Guessing Mechanism:
+   - Players can make a guess using the command: `/guess [LETTER]`
+   - A player can only guess once per game
+   - If a player guesses incorrectly, they are eliminated
+   - If a player correctly identifies the bot, they win
+
+4. Game End Conditions:
+   - A player correctly identifies the bot
+   - All human players are eliminated (bot wins)
+   - All but one player is eliminated
+
+5. Results Screen:
+   - Displays the winner
+   - Shows which player was the bot
+   - Provides a "Play Again" option to return to home screen
+
+## Game Termination
+- Game automatically ends when a win/loss condition is met
+- Players can leave a game at any time, which may result in elimination
+- After game conclusion, players can return to home screen to start a new match

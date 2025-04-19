@@ -1,0 +1,49 @@
+
+# Game Mechanics
+
+## Player Roles
+- **Human Players**: Two real users attempting to identify the bot while proving their own humanity
+- **Bot Player**: AI-controlled participant attempting to appear human
+
+## Game Setup
+- Game begins when 2 human players are matched
+- Each player is assigned a unique letter identifier (A, B, C)
+- One letter is randomly assigned to be the bot
+- Game starts in "active" state once all participants are connected
+
+## Core Gameplay Loop
+1. **Chat Interaction**:
+   - All players (human and bot) can send text messages to the chat
+   - Messages are visible to all participants
+   - Messages show the sender's letter identifier
+   - Human players must send at least one message every 30 seconds
+   - Bot generates messages automatically at varying intervals
+
+2. **Player Analysis**:
+   - Players must analyze the conversation to identify patterns that might reveal the bot
+   - Criteria may include response timing, language patterns, and content knowledge
+
+3. **Guessing Mechanism**:
+   - Players can submit a guess using the command: `/guess [LETTER]`
+   - Each player can only guess once per game
+   - Incorrect guesses result in immediate elimination
+   - Correct guess of the bot results in victory
+
+4. **Elimination Conditions**:
+   - Failing to send a message within the required timeframe
+   - Making an incorrect guess about the bot's identity
+   - Disconnecting from the game for an extended period
+
+## Timing and Constraints
+- **Message Frequency**: Players must send at least one message every 30 seconds
+- **Game Duration**: No fixed time limit; game continues until resolution
+- **Response Window**: Bot's response timing is variable to appear more human-like
+
+## Winning Conditions
+- **Human Victory**: First player to correctly identify which letter belongs to the bot
+- **Bot Victory**: All human players are eliminated (through incorrect guesses or time violations)
+
+## Game Progression
+- **Initial Phase**: Players begin communication to establish patterns
+- **Middle Phase**: Players analyze communication and form theories about the bot's identity
+- **Final Phase**: Players make guesses or attempt to elicit revealing responses

@@ -1,0 +1,59 @@
+
+# Technical Architecture
+
+## Frontend
+- **Framework**: React with TypeScript
+- **Routing**: Wouter for lightweight client-side routing
+- **State Management**:
+  - Zustand for global state management
+  - React Query for server state and data fetching
+- **UI Components**: Custom component library based on Radix UI primitives with Tailwind CSS
+- **Real-time Communication**: WebSockets for game communication
+
+## Backend
+- **Server**: Node.js with Express
+- **Real-time**: WebSocket server (ws library) for bidirectional communication
+- **Database**: SQL database with Drizzle ORM
+- **AI Integration**: Anthropic Claude API for bot responses
+
+## Database Schema
+- **Games Table**:
+  - id: Unique identifier for each game
+  - status: Current game state (waiting, active, finished)
+  - botLetter: Which player letter is assigned to the bot
+  - winnerPlayerId: ID of the winning player (if game is finished)
+
+- **Players Table**:
+  - id: Unique identifier for each player
+  - gameId: Reference to the associated game
+  - letter: Player's assigned letter (A, B, C)
+  - isBot: Boolean flag indicating if player is the bot
+  - hasGuessed: Boolean tracking if player has made a guess
+  - eliminated: Boolean indicating if player has been eliminated
+
+- **Messages Table**:
+  - id: Unique identifier for each message
+  - gameId: Reference to the associated game
+  - playerLetter: Letter of player who sent message
+  - content: Text content of the message
+  - createdAt: Timestamp of when message was sent
+
+## Core Services
+1. **Matchmaking Service**: 
+   - Manages player queue and game creation
+   - Handles pairing of human players and assigning bot
+
+2. **WebSocket Service**:
+   - Manages real-time communication between players
+   - Broadcasts messages and game state updates
+   - Handles player connection/disconnection events
+
+3. **Bot Service**:
+   - Integrates with AI API to generate bot responses
+   - Tracks conversation context and game state
+   - Determines when bot should respond
+
+4. **Game Logic Service**:
+   - Enforces game rules and timers
+   - Processes player commands and guesses
+   - Determines game outcomes and winner

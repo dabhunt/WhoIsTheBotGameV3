@@ -1,0 +1,74 @@
+
+# UI Components and Design
+
+## Home Screen
+- **Header**: Game title and tagline
+- **Game Information Panel**: 
+  - Player count display (2 players + 1 bot)
+  - Win condition summary 
+  - Decorative icons for players, bot, and winner
+- **Rules Section**:
+  - Bullet-point list of game rules
+  - Clear explanation of gameplay mechanics
+- **Call to Action**:
+  - Primary "Play Now" button to join queue
+  - Visual distinction using gradient styling
+- **Queue Status** (when in queue):
+  - Players in queue counter
+  - Estimated wait time display
+  - Animated loading indicator
+  - "Leave Queue" button option
+
+## Game Screen
+- **Layout**:
+  - Two-column layout (sidebar + main chat area)
+  - Responsive design for different screen sizes
+
+- **Player List Panel**:
+  - Shows all player letters (A, B, C)
+  - Displays status for each player:
+    - Active: Currently in game
+    - Guessed: Has made a guess
+    - Eliminated: No longer active
+  - Visual indicators for eliminated players
+
+- **Chat Interface**:
+  - Message history area showing all conversation
+  - Each message displays:
+    - Player letter of sender
+    - Message content
+    - Timestamp (optional)
+  - Message input area with:
+    - Text input field
+    - Send button
+    - Character limit indication
+  - Auto-scrolling to latest messages
+  - Visual distinction between different players' messages
+
+- **Game Status Information**:
+  - Timer indicating how long until player must send message
+  - Visual indicator for active game state
+  - Game over notification when applicable
+
+- **End Game Panel**:
+  - Winner announcement
+  - Reveal of which player was the bot
+  - "Play Again" button to return to home screen
+
+## Visual Design Elements
+- **Color Scheme**:
+  - Dark mode interface with slate backgrounds
+  - Accent colors: blue, purple, green
+  - Gradient effects for visual interest
+  - High contrast for readability
+
+- **Typography**:
+  - Clear hierarchical structure with varying sizes
+  - Modern sans-serif fonts for readability
+  - Gradient text effects for headings
+
+- **Interactive Elements**:
+  - Hover and active states for buttons
+  - Loading animations for processes
+  - Toast notifications for system messages
+  - Subtle transitions between states
