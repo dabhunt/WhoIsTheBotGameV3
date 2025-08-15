@@ -1,33 +1,40 @@
-import { useLocation } from 'wouter';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { useQueueStore } from '@/lib/queue';
-import { Bot, Users, Target, Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useQueueStore } from "@/lib/queue";
+import { Bot, Users, Target, Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 export function Home() {
   const [, setLocation] = useLocation();
-  const { inQueue, playersInQueue, estimatedWaitTime, joinQueue, leaveQueue, gameData } = useQueueStore();
+  const {
+    inQueue,
+    playersInQueue,
+    estimatedWaitTime,
+    joinQueue,
+    leaveQueue,
+    gameData,
+  } = useQueueStore();
 
   // Handle navigation when game data is available
   useEffect(() => {
     if (gameData) {
-      console.log('Game data available, preparing for navigation:', gameData);
+      console.log("Game data available, preparing for navigation:", gameData);
       const gameRoute = `/game/${gameData.gameId}?letter=${gameData.letter}`;
-      console.log('Navigating to:', gameRoute);
+      console.log("Navigating to:", gameRoute);
 
       // Navigate first
       setLocation(gameRoute);
 
       // Clear game data after a delay to ensure navigation completes
       const timeoutId = setTimeout(() => {
-        console.log('Navigation complete, clearing game data');
+        console.log("Navigation complete, clearing game data");
         useQueueStore.getState().setGameData(null);
       }, 500);
 
       // Properly clear the timeout on cleanup
       return () => {
-        console.log('Cleaning up navigation timeout');
+        console.log("Cleaning up navigation timeout");
         clearTimeout(timeoutId);
       };
     }
@@ -42,14 +49,15 @@ export function Home() {
               Who Is The Bot?
             </h1>
             <p className="text-xl text-white">
-              A unique multiplayer twist on the Turing test where deception and detection collide
+              A unique multiplayer twist on the Turing test where deception and
+              detection collide
             </p>
           </div>
 
           <div className="flex justify-center space-x-8 py-6">
             <div className="flex items-center space-x-2">
               <Users className="w-6 h-6 text-blue-400" />
-              <span className="text-lg text-white">2 Players</span>
+              <span className="text-lg text-white">2-8 Players</span>
             </div>
             <div className="flex items-center space-x-2">
               <Bot className="w-6 h-6 text-purple-400" />
@@ -65,13 +73,13 @@ export function Home() {
             <h2 className="text-2xl font-semibold text-white">Game Rules</h2>
             <ul className="space-y-3">
               {[
-                'Join a game with one other player',
-                'One player is secretly an AI bot',
-                'Chat with others to figure out who\'s the bot',
-                'You must send a message every 30 seconds or be eliminated',
-                'Use /guess [LETTER] to make your guess',
-                'Guess wrong and you\'re eliminated!',
-                'First to correctly identify the bot wins'
+                "Join a game with one other player",
+                "One player is secretly an AI bot",
+                "Chat with others to figure out who's the bot",
+                "You must send a message every 30 seconds or be eliminated",
+                "Use /guess [LETTER] to make your guess",
+                "Guess wrong and you're eliminated!",
+                "First to correctly identify the bot wins",
               ].map((rule, index) => (
                 <li key={index} className="flex items-center text-white">
                   <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
@@ -113,7 +121,8 @@ export function Home() {
           )}
 
           <p className="text-center text-white text-sm">
-            Can you outsmart the AI and spot the digital impostor? Test your human intuition now!
+            Can you outsmart the AI and spot the digital impostor? Test your
+            human intuition now!
           </p>
         </CardContent>
       </Card>
