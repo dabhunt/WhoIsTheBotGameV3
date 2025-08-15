@@ -1,10 +1,26 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from 'express-session';
+import MemoryStore from 'memorystore';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Session middleware setup
+const store = MemoryStore(session);
+app.use(session({
+    secret: 'your-secret-key', // In a real app, use an environment variable
+    resave: false,
+    saveUninitialized: true,
+    store: new store({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    }),
+    cookie: {
+      maxAge: 86400000 // 24 hours
+    }
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();

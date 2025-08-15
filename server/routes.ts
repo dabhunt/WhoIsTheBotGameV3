@@ -20,8 +20,8 @@ export function registerRoutes(app: Express): Server {
   // Game matchmaking endpoint
   app.post('/api/games/join', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Get or create a game session
-      const result = await findOrCreateGame();
+      // Get or create a game session, using the session ID to identify the player
+      const result = await findOrCreateGame(req.sessionID);
       res.json(result);
     } catch (error) {
       if (error instanceof MatchmakingError) {
