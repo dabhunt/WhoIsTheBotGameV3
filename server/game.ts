@@ -27,6 +27,7 @@ const waitingPlayers = new Map<string, WaitingPlayer>();
 const activeGames = new Map<number, GameState>();
 
 let lastGameCreationTime = 0;
+let matchmakingLocked = false; // Simple lock to prevent race conditions
 
 async function cleanupStaleGames() {
   const staleTime = Date.now() - STALE_GAME_THRESHOLD;
@@ -128,32 +129,44 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
   const requestId = Math.random().toString(36).substring(7);
   const matchmakingId = Math.random().toString(36).substring(7);
 
+  // Add current player to waiting list BEFORE the main try...catch
+  // So that the finally block can clean it up if needed
+  waitingPlayers.set(matchmakingId, {
+    timestamp: Date.now(),
+    matchmakingId,
+  });
+
   try {
     logMatchmaking('Starting matchmaking process', { requestId });
 
     await cleanupStaleGames();
 
-    // Add current player to waiting list
-    waitingPlayers.set(matchmakingId, {
-      timestamp: Date.now(),
-      matchmakingId
-    });
-
     const currentWaitingCount = getWaitingPlayersCount();
     logMatchmaking('Current waiting players', { requestId, count: currentWaitingCount });
 
-    // Return queue state if we don't have exactly 2 players
+    // If a game is already being created, just return queue status
+    if (matchmakingLocked) {
+      logMatchmaking('Matchmaking is locked, returning queue state', { requestId });
+      return {
+        queueState: {
+          playersInQueue: currentWaitingCount,
+          estimatedWaitTime: BASE_WAIT_TIME,
+        },
+      };
+    }
+
+    // Return queue state if we don't have enough players
     if (currentWaitingCount < REQUIRED_HUMAN_PLAYERS) {
       logMatchmaking('Not enough players, returning queue state', {
         requestId,
         currentCount: currentWaitingCount,
-        required: REQUIRED_HUMAN_PLAYERS
+        required: REQUIRED_HUMAN_PLAYERS,
       });
       return {
         queueState: {
           playersInQueue: currentWaitingCount,
-          estimatedWaitTime: BASE_WAIT_TIME
-        }
+          estimatedWaitTime: BASE_WAIT_TIME,
+        },
       };
     }
 
@@ -162,68 +175,77 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
     if (now - lastGameCreationTime < MIN_GAME_CREATION_INTERVAL) {
       logMatchmaking('Too soon to create game, waiting', {
         requestId,
-        timeRemaining: MIN_GAME_CREATION_INTERVAL - (now - lastGameCreationTime)
+        timeRemaining: MIN_GAME_CREATION_INTERVAL - (now - lastGameCreationTime),
       });
       return {
         queueState: {
           playersInQueue: currentWaitingCount,
-          estimatedWaitTime: Math.ceil((MIN_GAME_CREATION_INTERVAL - (now - lastGameCreationTime)) / 1000)
-        }
+          estimatedWaitTime: Math.ceil((MIN_GAME_CREATION_INTERVAL - (now - lastGameCreationTime)) / 1000),
+        },
       };
     }
 
-    // Get exactly 2 waiting players (FIFO)
-    const waitingPlayersList = Array.from(waitingPlayers.entries())
-      .sort((a, b) => a[1].timestamp - b[1].timestamp)
-      .slice(0, REQUIRED_HUMAN_PLAYERS)
-      .map(([id]) => id);
-
-    // Create game with bot
-    const { id: gameId, botLetter } = await createGameWithBot();
-    lastGameCreationTime = now;
+    // --- CRITICAL SECTION START ---
+    // Lock to prevent other requests from creating a game simultaneously
+    matchmakingLocked = true;
 
     try {
+        // Re-check player count inside lock, another process might have acted.
+      const lockedWaitingCount = getWaitingPlayersCount();
+      if (lockedWaitingCount < REQUIRED_HUMAN_PLAYERS) {
+        logMatchmaking('Not enough players after lock, returning queue state', { requestId });
+        return {
+          queueState: {
+            playersInQueue: lockedWaitingCount,
+            estimatedWaitTime: BASE_WAIT_TIME,
+          },
+        };
+      }
+
+      // Get exactly 2 waiting players (FIFO) and remove them from the queue immediately
+      const waitingPlayersList = Array.from(waitingPlayers.entries())
+        .sort((a, b) => a[1].timestamp - b[1].timestamp)
+        .slice(0, REQUIRED_HUMAN_PLAYERS)
+        .map(([id]) => id);
+
+      waitingPlayersList.forEach(id => waitingPlayers.delete(id));
+
+      // Create game with bot
+      const { id: gameId, botLetter } = await createGameWithBot();
+      lastGameCreationTime = now;
+
       const result = await db.transaction(async (tx) => {
         const game = await tx.query.games.findFirst({
           where: eq(games.id, gameId),
-          with: {
-            players: true
-          }
+          with: { players: true },
         });
 
         if (!game) {
           throw new MatchmakingError('Game not found', ErrorCodes.GAME_NOT_FOUND, 404);
         }
 
-        // Get available letters (excluding bot's letter)
         const availableLetters = LETTERS.filter(l => l !== botLetter);
 
-        // Add both human players
         for (let i = 0; i < waitingPlayersList.length; i++) {
           await tx.insert(players).values({
             gameId: game.id,
             letter: availableLetters[i],
             isBot: false,
             hasGuessed: false,
-            eliminated: false
+            eliminated: false,
           });
         }
 
-        // Set game as active
         await tx.update(games)
           .set({ status: 'active' })
           .where(eq(games.id, gameId));
 
-        // Remove matched players from waiting list
-        waitingPlayersList.forEach(id => waitingPlayers.delete(id));
-
         return {
           gameId: game.id,
-          letter: availableLetters[0] // First player gets first available letter
+          letter: availableLetters[0],
         };
       });
 
-      // Update game state
       const gameState = activeGames.get(gameId);
       if (gameState) {
         gameState.status = 'active';
@@ -234,18 +256,23 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
       logMatchmaking('Game created successfully', {
         requestId,
         gameId: result.gameId,
-        playerCount: MAX_PLAYERS
+        playerCount: MAX_PLAYERS,
       });
 
       return result;
 
     } catch (error) {
       logError('Failed to add players to game', { error: error as Error });
+      // If creating the game fails, we should ideally put the players back in the queue.
+      // For now, we'll just let the error propagate. The players will have to rejoin.
       throw error;
+    } finally {
+      // --- CRITICAL SECTION END ---
+      matchmakingLocked = false; // Always release the lock
     }
 
   } catch (error) {
-    // Clean up this player from waiting list if there was an error
+    // If an error occurs, ensure this player is removed from the waiting list.
     waitingPlayers.delete(matchmakingId);
 
     if (error instanceof MatchmakingError) {
@@ -256,7 +283,7 @@ export async function findOrCreateGame(): Promise<MatchmakingResult> {
     throw new MatchmakingError(
       'Unexpected error in matchmaking',
       ErrorCodes.DATABASE_ERROR,
-      500
+      500,
     );
   }
 }
