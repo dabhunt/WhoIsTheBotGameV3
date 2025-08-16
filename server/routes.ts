@@ -17,6 +17,11 @@ export function registerRoutes(app: Express): Server {
   // Add request logging middleware
   app.use(requestLogger);
 
+  // Endpoint to get the current session ID
+  app.get('/api/session', (req, res) => {
+    res.json({ sessionId: req.sessionID });
+  });
+
   // Game matchmaking endpoint
   app.post('/api/games/join', async (req: Request, res: Response, next: NextFunction) => {
     try {
